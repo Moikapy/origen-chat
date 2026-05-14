@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
-/// Cloudflare Workers environment bindings
 interface CloudflareEnv {
   DB: D1Database;
+  SEB: SendEmail; // Cloudflare Email Sending binding
   RESEND_API_KEY: string;
   OPENROUTER_ENCRYPT_KEY: string;
   OPENROUTER_ENCRYPT_KEY_PREVIOUS?: string;

@@ -11,3 +11,5 @@ bun.lock
 .codebase-wiki/
 .wrangler/
 .dev.vars
+scripts/.env
+scripts/

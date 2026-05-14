@@ -3,7 +3,8 @@
 declare module "@moikapy/magic-link" {
   export function sendMagicLink(email: string, config: {
     db: D1Database;
-    resendApiKey: string;
+    sendEmail?: { send: (msg: EmailMessage) => Promise<{ messageId: string }> };
+    resendApiKey?: string;
     fromEmail: string;
     appName: string;
     baseUrl?: string;

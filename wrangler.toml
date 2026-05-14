@@ -14,5 +14,9 @@ binding = "DB"
 database_name = "origen-chat-db"
 database_id = "1262c9af-0a6d-4baa-93b8-9cf87aec1c45"
 
+# Cloudflare Email Sending — native Workers binding (free: 3K emails/month)
+[[send_email]]
+name = "SEB"
+
 [vars]
 APP_URL = "https://origen-chat.moikapy.workers.dev"

@@ -13,8 +13,12 @@ export async function POST(request: Request) {
   }
 
   const { env } = await getCtx();
+
   const result = await sendMagicLink(email.trim().toLowerCase(), {
     db: env.DB,
+    // Cloudflare Email Sending binding — free 3K emails/month
+    sendEmail: env.SEB,
+    // Fallback: Resend (set as wrangler secret)
     resendApiKey: env.RESEND_API_KEY,
     fromEmail: "Origen Chat <noreply@moikapy.dev>",
     appName: "Origen Chat",
@@ -28,8 +32,9 @@ export async function POST(request: Request) {
 async function getCtx() {
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare" as string);
-    return getCloudflareContext();
+    const { env } = await getCloudflareContext();
+    return { env };
   } catch {
-    return { env: { DB: null, RESEND_API_KEY: "", OPENROUTER_ENCRYPT_KEY: "", APP_URL: "http://localhost:3456" } };
+    return { env: { DB: null, SEB: null, RESEND_API_KEY: "", APP_URL: "http://localhost:3456" } };
   }
 }
