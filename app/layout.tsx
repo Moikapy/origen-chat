@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { ThemeProvider } from "@0xkobold/warm-editorial";
-import "@0xkobold/warm-editorial/styles.css";
+import { ClientLayout } from "@/components/client-layout";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,9 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body>
-        <ThemeProvider defaultTheme="dark">
-          {children}
-        </ThemeProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { checkAuth, type AuthCheckResult } from "@moikapy/origen";
 
 interface AuthData {
   provider: string;
@@ -14,15 +13,14 @@ export function ProviderSettings({ onClose }: { onClose: () => void }) {
     if (typeof window === "undefined") return { provider: "openrouter", apiKey: "" };
     const stored = localStorage.getItem("origen_chat_auth");
     if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch { /* ignore */ }
+      try { return JSON.parse(stored); }
+      catch { /* ignore */ }
     }
     return { provider: "openrouter", apiKey: "" };
   });
 
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<AuthCheckResult | null>(null);
 
   const save = () => {
     localStorage.setItem("origen_chat_auth", JSON.stringify(auth));
@@ -33,17 +31,24 @@ export function ProviderSettings({ onClose }: { onClose: () => void }) {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await checkAuth(async (provider: string) => {
-        if (provider === auth.provider) return auth.apiKey;
-        return undefined;
+      // Simple validation: try a models list request
+      const baseUrl = auth.provider === "ollama"
+        ? (auth.ollamaBaseUrl || "https://api.ollama.com/v1")
+        : "https://openrouter.ai/api/v1";
+
+      const res = await fetch(`${baseUrl}/models`, {
+        headers: auth.provider === "openrouter"
+          ? { Authorization: `Bearer ${auth.apiKey}` }
+          : {},
       });
-      setTestResult(result);
+
+      if (res.ok) {
+        setTestResult({ ok: true, msg: `✓ Connected to ${auth.provider}` });
+      } else {
+        setTestResult({ ok: false, msg: `✗ ${res.status}: ${res.statusText}` });
+      }
     } catch (err) {
-      setTestResult({
-        authenticated: false,
-        apiKey: null,
-        error: err instanceof Error ? err.message : "Test failed",
-      });
+      setTestResult({ ok: false, msg: `✗ ${err instanceof Error ? err.message : "Connection failed"}` });
     } finally {
       setTesting(false);
     }
@@ -113,10 +118,8 @@ export function ProviderSettings({ onClose }: { onClose: () => void }) {
       </div>
 
       {testResult && (
-        <div className={`mt-3 text-sm ${testResult.authenticated ? "text-primary" : "text-destructive"}`}>
-          {testResult.authenticated
-            ? `✓ Connected as ${testResult.provider}`
-            : `✗ ${testResult.error}`}
+        <div className={`mt-3 text-sm ${testResult.ok ? "text-primary" : "text-destructive"}`}>
+          {testResult.msg}
         </div>
       )}
     </div>
