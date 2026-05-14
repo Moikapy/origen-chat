@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     sendEmail: env.SEB,
     // Fallback: Resend (set as wrangler secret)
     resendApiKey: env.RESEND_API_KEY,
-    fromEmail: "Origen Chat <noreply@moikapy.dev>",
+    fromEmail: "Origen Chat <no_reply@moikapy.dev>",
     appName: "Origen Chat",
     baseUrl: env.APP_URL || "https://origen-chat.moikapy.workers.dev",
     verifyPath: "/auth/verify",

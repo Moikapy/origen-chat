@@ -23,21 +23,29 @@ export default function VerifyPage() {
     window.history.replaceState({}, "", url.pathname);
 
     // Verify the token via the API route
-    fetch(`/auth/verify?token=${encodeURIComponent(token)}`)
+    fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`, {
+      redirect: "manual", // Don't follow redirects — we handle them manually
+    })
       .then((res) => {
-        if (res.redirected) {
-          // Server redirected us home — success
+        if (res.status === 302) {
+          // Success — redirect to home (the Set-Cookie header is in the response)
+          const setCookie = res.headers.get("Set-Cookie");
+          if (setCookie) {
+            document.cookie = setCookie;
+          }
           setStatus("success");
           window.location.href = "/";
-        } else if (res.ok) {
-          setStatus("success");
-          setTimeout(() => { window.location.href = "/"; }, 1000);
-        } else {
-          return res.json().then((data) => {
-            setStatus("error");
-            setError((data as any).error || "Verification failed");
-          });
+          return;
         }
+        if (res.ok) {
+          setStatus("success");
+          window.location.href = "/";
+          return;
+        }
+        return res.json().then((data) => {
+          setStatus("error");
+          setError((data as any).error || "Verification failed");
+        });
       })
       .catch(() => {
         setStatus("error");
