@@ -1,10 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClientLayout } from "@/components/client-layout";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Origen Chat",
-  description: "AI agent powered by Origen",
+  description: "Chat with any AI model — free models included, no vendor lock-in",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Origen",
+  },
+  openGraph: {
+    title: "Origen Chat",
+    description: "Chat with any AI model — free models included",
+    type: "website",
+    siteName: "Origen Chat",
+  },
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/icons/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#10b981",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
