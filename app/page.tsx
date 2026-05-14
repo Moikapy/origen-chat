@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -8,10 +9,9 @@ import { Badge } from "@0xkobold/warm-editorial";
 import { ChatMessage } from "@/components/chat-message";
 import { ModelSelector } from "@/components/model-selector";
 import { WikiToggle } from "@/components/wiki-toggle";
-import { ProviderSettings } from "@/components/provider-settings";
-import { MODELS, MODEL_GROUPS, type ModelId } from "@/lib/models";
+import { MODELS, type ModelId } from "@/lib/models";
 
-// Client-safe StreamEvent type (mirrors @moikapy/origen)
+// Client-safe StreamEvent type
 type StreamEvent =
   | { type: "reasoning"; content: string }
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
@@ -36,7 +36,6 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [model, setModel] = useState<string>("openrouter/free");
   const [wikiEnabled, setWikiEnabled] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const editor = useEditor({
@@ -45,17 +44,10 @@ export default function ChatPage() {
       Placeholder.configure({ placeholder: "Ask anything..." }),
     ],
     content: "",
-    immediatelyRender: false, // Fix SSR hydration
+    immediatelyRender: false,
     editorProps: {
       attributes: {
         class: "prose prose-sm prose-invert max-w-none focus:outline-none min-h-[2rem]",
-      },
-      handleKeyDown: (view, event) => {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          return false; // Let parent handle via onKeyDown
-        }
-        return false;
       },
     },
   });
@@ -102,9 +94,9 @@ export default function ChatPage() {
       if (!res.ok) {
         const err = await res.text();
         setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `Error: ${err}`, streaming: false };
-          return updated;
+          const u = [...prev];
+          u[u.length - 1] = { ...u[u.length - 1], content: `Error: ${err}`, streaming: false };
+          return u;
         });
         return;
       }
@@ -201,29 +193,21 @@ export default function ChatPage() {
       {/* Header */}
       <header className="border-b border-border px-4 py-3">
         <div className="mx-auto max-w-3xl flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">Origen Chat</h1>
+          <h1 className="text-lg font-semibold tracking-tight">
+            <Link href="/" className="hover:opacity-80 transition-opacity">Origen Chat</Link>
+          </h1>
           <div className="flex items-center gap-3">
             <ModelSelector value={model} onChange={setModel} />
             <WikiToggle enabled={wikiEnabled} onToggle={setWikiEnabled} />
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1"
-              aria-label="Settings"
+            <Link
+              href="/settings"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              ⚙️
-            </button>
+              Settings
+            </Link>
           </div>
         </div>
       </header>
-
-      {/* Settings panel */}
-      {showSettings && (
-        <div className="border-b border-border px-4 py-3">
-          <div className="mx-auto max-w-3xl">
-            <ProviderSettings onClose={() => setShowSettings(false)} />
-          </div>
-        </div>
-      )}
 
       {/* Messages */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
@@ -231,7 +215,7 @@ export default function ChatPage() {
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-16">
               <p className="text-2xl font-semibold text-foreground mb-2">Origen Chat</p>
-              <p>Ask anything. Use the gear icon to configure your provider.</p>
+              <p>Ask anything. Configure your provider in <Link href="/settings" className="text-primary hover:underline">Settings</Link>.</p>
             </div>
           )}
           {messages.map((msg) => (

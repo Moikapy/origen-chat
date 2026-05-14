@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Cloudflare Workers — no server-side features
-  output: "export",
+  // Cloudflare Workers — OpenNext handles the serverless build
+  // Don't use "export" — it breaks dynamic routes and API routes
 };
 
 export default nextConfig;

@@ -6,3 +6,6 @@ dist/
 .vercel/
 *.tsbuildinfo
 bun.lock
+
+# Codebase wiki — compiled artifact, regenerated from source
+.codebase-wiki/
