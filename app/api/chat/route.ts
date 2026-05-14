@@ -1,7 +1,8 @@
-import { streamOrigen, type StreamEvent } from "@moikapy/origen";
+import { streamOrigen, type StreamEvent, type OrigenTool, type AgentConfig, type D1Like } from "@moikapy/origen";
 import { buildAgentConfig, type ChatConfig } from "@/lib/config";
 
-export const runtime = "edge";
+// No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
+export const maxDuration = 60;
 
 interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;

@@ -1,4 +1,4 @@
-import { type OrigenTool, type ModelId, type AgentConfig } from "@moikapy/origen";
+import { type OrigenTool, type ModelId, type AgentConfig, type D1Like } from "@moikapy/origen";
 import { createWikipediaTool } from "./tools/wikipedia";
 
 export interface ChatConfig {
@@ -19,7 +19,7 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
     appName: "Origen Chat",
     model: config.model as ModelId,
     tools,
-    getD1: getD1 as () => Promise<import("@moikapy/origen").D1Like>,
+    getD1: getD1 as () => Promise<D1Like>,
     getApiKey: async (provider: string) => {
       if (config.provider === provider) return config.apiKey;
       return undefined;
