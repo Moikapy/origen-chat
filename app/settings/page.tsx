@@ -10,7 +10,7 @@ interface OllamaConfig {
 }
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [ollamaConfig, setOllamaConfig] = useState<OllamaConfig>({
     baseUrl: "https://api.ollama.com/v1",
     apiKey: "",
@@ -26,6 +26,28 @@ export default function SettingsPage() {
       catch { /* ignore */ }
     }
   }, []);
+
+  // Redirect to login if not authenticated
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="animate-pulse h-2 w-2 rounded-full bg-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-lg">Sign in to access settings</p>
+          <Link href="/auth/login" className="inline-block text-sm px-4 py-2 rounded-lg bg-foreground text-background hover:opacity-90 transition-colors">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const saveOllama = () => {
     localStorage.setItem("origen_ollama_config", JSON.stringify(ollamaConfig));
@@ -54,49 +76,29 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-xl px-4 py-8">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+          <Link href="/chat" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
             ← Back
           </Link>
           <h1 className="text-lg font-semibold">Settings</h1>
         </div>
 
         <section className="space-y-6">
-          {/* OpenRouter Auth */}
           <div>
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">OpenRouter</h2>
-            {user ? (
-              <div className="space-y-2">
-                <p className="text-sm text-foreground">
-                  ✅ Signed in as <span className="font-medium">{user.email}</span>
-                </p>
-                <button
-                  onClick={logout}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Connect your OpenRouter account to use premium models.
-                </p>
-                <Link
-                  href="/auth/login"
-                  className="inline-block text-sm px-4 py-2 rounded-lg bg-foreground text-background hover:opacity-90 transition-colors"
-                >
-                  Sign in with email
-                </Link>
-              </div>
-            )}
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Account</h2>
+            <p className="text-sm">
+              ✅ Signed in as <span className="font-medium">{user.email}</span>
+            </p>
+            <button
+              onClick={logout}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1"
+            >
+              Sign out
+            </button>
           </div>
 
-          {/* Divider */}
           <div className="border-t border-border" />
 
-          {/* Ollama Cloud */}
           <div>
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Ollama Cloud</h2>
             <div className="space-y-3">

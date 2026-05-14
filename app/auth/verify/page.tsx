@@ -34,12 +34,12 @@ export default function VerifyPage() {
             document.cookie = setCookie;
           }
           setStatus("success");
-          window.location.href = "/";
+          window.location.href = "/chat";
           return;
         }
         if (res.ok) {
           setStatus("success");
-          window.location.href = "/";
+          window.location.href = "/chat";
           return;
         }
         return res.json().then((data) => {

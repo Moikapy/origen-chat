@@ -27,7 +27,7 @@ export default function AuthCallback() {
         return res.json();
       })
       .then(() => {
-        router.push("/");
+        router.push("/chat");
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Auth failed");

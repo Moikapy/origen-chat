@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   // Set session cookie and redirect home
   const headers = new Headers();
-  headers.set("Location", env.APP_URL || APP_URL);
+  headers.set("Location", (env.APP_URL || APP_URL) + "/chat");
   headers.set("Set-Cookie", `magic_session=${result.sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
   return new Response(null, { status: 302, headers });
 }
