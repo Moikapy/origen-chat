@@ -5,11 +5,9 @@ import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Badge } from "@0xkobold/warm-editorial";
 import { ChatMessage } from "@/components/chat-message";
 import { ModelSelector } from "@/components/model-selector";
-import { WikiToggle } from "@/components/wiki-toggle";
-import { MODELS, type ModelId } from "@/lib/models";
+import { useAuth } from "@/lib/auth";
 
 // Client-safe StreamEvent type
 type StreamEvent =
@@ -32,10 +30,10 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const { user, logout } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [model, setModel] = useState<string>("openrouter/free");
-  const [wikiEnabled, setWikiEnabled] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const editor = useEditor({
@@ -51,6 +49,10 @@ export default function ChatPage() {
       },
     },
   });
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+  }, []);
 
   const sendMessage = useCallback(async () => {
     if (!editor || streaming) return;
@@ -78,14 +80,14 @@ export default function ChatPage() {
     abortRef.current = abort;
 
     try {
-      const auth = getAuthFromStorage();
+      const auth = getAuthConfig();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
           model,
-          wiki: wikiEnabled,
+          wiki: true,
           ...auth,
         }),
         signal: abort.signal,
@@ -186,7 +188,7 @@ export default function ChatPage() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [editor, streaming, messages, model, wikiEnabled]);
+  }, [editor, streaming, messages, model]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -198,7 +200,28 @@ export default function ChatPage() {
           </h1>
           <div className="flex items-center gap-3">
             <ModelSelector value={model} onChange={setModel} />
-            <WikiToggle enabled={wikiEnabled} onToggle={setWikiEnabled} />
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>
+                <button
+                  onClick={logout}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <Link href="/auth/login" className="text-sm text-primary hover:underline">
+                Sign in
+              </Link>
+            )}
+            <button
+              onClick={clearChat}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="New chat"
+            >
+              New
+            </button>
             <Link
               href="/settings"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -215,7 +238,7 @@ export default function ChatPage() {
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-16">
               <p className="text-2xl font-semibold text-foreground mb-2">Origen Chat</p>
-              <p>Ask anything. Configure your provider in <Link href="/settings" className="text-primary hover:underline">Settings</Link>.</p>
+              <p>Ask anything. {user ? `Signed in as ${user.email}` : <Link href="/auth/login" className="text-primary hover:underline">Sign in</Link>} for your provider settings.</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -264,21 +287,20 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-          {wikiEnabled && (
-            <div className="mt-2">
-              <Badge variant="default">Wiki ON</Badge>
-            </div>
-          )}
         </div>
       </footer>
     </div>
   );
 }
 
-function getAuthFromStorage() {
+/** Get auth config from localStorage (Ollama) — OpenRouter auth is via encrypted cookie */
+function getAuthConfig(): Record<string, string> {
   if (typeof window === "undefined") return {};
-  const stored = localStorage.getItem("origen_chat_auth");
+  const stored = localStorage.getItem("origen_ollama_config");
   if (!stored) return {};
-  try { return JSON.parse(stored); }
-  catch { return {}; }
+  try {
+    const config = JSON.parse(stored);
+    if (config.baseUrl) return { ollamaBaseUrl: config.baseUrl, ollamaApiKey: config.apiKey || "" };
+    return {};
+  } catch { return {}; }
 }

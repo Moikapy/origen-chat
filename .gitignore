@@ -10,3 +10,4 @@ bun.lock
 # Codebase wiki — compiled artifact, regenerated from source
 .codebase-wiki/
 .wrangler/
+.dev.vars

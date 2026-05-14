@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@0xkobold/warm-editorial": "file:../warm-editorial",
+    "@moikapy/magic-link": "^0.1.2",
+    "@moikapy/openrouter-auth": "^0.1.0",
     "@moikapy/origen": "^0.5.1",
     "@tailwindcss/postcss": "^4.3.0",
     "@tailwindcss/typography": "^0.5.19",
@@ -26,6 +28,7 @@
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260514.1",
     "@opennextjs/cloudflare": "^1.19.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

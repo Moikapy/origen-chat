@@ -1,5 +1,6 @@
-import { streamOrigen, type StreamEvent, type OrigenTool, type AgentConfig, type D1Like } from "@moikapy/origen";
+import { streamOrigen, type StreamEvent } from "@moikapy/origen";
 import { buildAgentConfig, type ChatConfig } from "@/lib/config";
+import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
 export const maxDuration = 60;
@@ -8,27 +9,32 @@ interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   model: string;
   wiki: boolean;
-  provider: string;
-  apiKey: string;
   ollamaBaseUrl?: string;
+  ollamaApiKey?: string;
 }
 
 export async function POST(request: Request): Promise<Response> {
   const body: ChatRequest = await request.json();
+  const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey } = body;
 
-  const { messages, model, wiki, provider, apiKey, ollamaBaseUrl } = body;
+  // Get API key from encrypted cookie (OpenRouter OAuth) or fall back to client-passed
+  const cookieApiKey = await getApiKeyFromCookie({
+    encryptKey: process.env.OPENROUTER_ENCRYPT_KEY!,
+    previousKeys: process.env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
+  });
 
+  const apiKey = cookieApiKey || ollamaApiKey || "";
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "API key required" }), {
+    return new Response(JSON.stringify({ error: "No API key. Sign in via Settings or provide an Ollama key." }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
 
+  const provider = ollamaBaseUrl ? "ollama" : "openrouter";
   const config = buildAgentConfig(
     { model, wiki, provider, apiKey, ollamaBaseUrl } as ChatConfig,
     async () => {
-      // D1 binding stub — will be replaced with real binding in wrangler.toml
       throw new Error("D1 not configured");
     },
   );
