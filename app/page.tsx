@@ -1,29 +1,14 @@
 "use client";
 
 import Link from "next/link";
-
-const MODELS = [
-  { name: "Free", tier: "free", desc: "Auto-selects best free model" },
-  { name: "DeepSeek V3", tier: "free", desc: "Powerful chat model" },
-  { name: "DeepSeek R1", tier: "free", desc: "Reasoning model" },
-  { name: "Gemini 2.0 Flash", tier: "free", desc: "Fast multimodal" },
-  { name: "Nemotron 3 Super", tier: "free", desc: "NVIDIA 120B MoE" },
-  { name: "Ring 2.6", tier: "free", desc: "1T-parameter model" },
-  { name: "Claude Sonnet 4", tier: "premium", desc: "$3/$15 per 1M tokens" },
-  { name: "Claude Opus 4", tier: "premium", desc: "$15/$75 per 1M tokens" },
-  { name: "Gemini 2.5 Pro", tier: "premium", desc: "$1.25/$10 per 1M tokens" },
-  { name: "Gemini 2.5 Flash", tier: "premium", desc: "$0.15/$0.60 per 1M tokens" },
-  { name: "GPT-4o", tier: "premium", desc: "$2.50/$10 per 1M tokens" },
-  { name: "GPT-4.1", tier: "premium", desc: "$2/$8 per 1M tokens" },
-  { name: "GPT-4.1 Mini", tier: "premium", desc: "$0.40/$1.60 per 1M tokens" },
-  { name: "O3 Mini", tier: "premium", desc: "Reasoning, $1.10/$4.40" },
-  { name: "O4 Mini", tier: "premium", desc: "Reasoning, $1.10/$4.40" },
-  { name: "Llama 4 Maverick", tier: "premium", desc: "Meta 400B MoE" },
-  { name: "Grok 3", tier: "premium", desc: "xAI, $3/$15 per 1M" },
-  { name: "Mistral 3.1 Small", tier: "premium", desc: "Fast, $0.10/$0.30" },
-];
+import { useModels } from "@/lib/use-models";
 
 export default function LandingPage() {
+  const { models, loading } = useModels();
+
+  const freeModels = models.filter((m) => m.free);
+  const premiumModels = models.filter((m) => !m.free);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -51,7 +36,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-medium mb-8">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            5 free models — no account needed
+            {freeModels.length} free models — no account needed
           </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
@@ -84,7 +69,7 @@ export default function LandingPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       </section>
 
-      {/* Models grid */}
+      {/* Models grid — dynamic from OpenRouter API */}
       <section className="border-t border-border/50">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <div className="text-center mb-12">
@@ -92,23 +77,40 @@ export default function LandingPage() {
             <p className="text-muted-foreground">Free models work without an account. Premium models need an API key.</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3">
-            {MODELS.map((m) => (
-              <div
-                key={m.name}
-                className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
-                  m.tier === "free"
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-border bg-card text-muted-foreground"
-                }`}
-              >
-                <div className="font-medium">{m.name}</div>
-                <div className="text-xs mt-0.5 opacity-75">
-                  {m.tier === "free" ? "✓ Free" : m.desc}
+          {loading ? (
+            <div className="text-center text-muted-foreground py-8">Loading models…</div>
+          ) : (
+            <>
+              {freeModels.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-medium text-primary mb-3">Free</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {freeModels.map((m) => (
+                      <div key={m.id} className="rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2.5 text-left text-sm">
+                        <div className="font-medium">{m.name}</div>
+                        <div className="text-xs mt-0.5 opacity-75">✓ Free</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+              {premiumModels.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Premium</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {premiumModels.map((m) => (
+                      <div key={m.id} className="rounded-lg border border-border bg-card text-muted-foreground px-3 py-2.5 text-left text-sm">
+                        <div className="font-medium text-foreground">{m.name}</div>
+                        <div className="text-xs mt-0.5 opacity-75">
+                          {m.pricing ? `${m.pricing.prompt}/${m.pricing.completion}` : "Premium"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 

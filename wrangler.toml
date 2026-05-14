@@ -8,6 +8,7 @@ main = ".open-next/worker.js"
 directory = ".open-next/assets"
 binding = "ASSETS"
 run_worker_first = true
+not_found_handling = "single-page-application"
 
 [[d1_databases]]
 binding = "DB"
