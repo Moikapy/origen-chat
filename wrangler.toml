@@ -20,3 +20,4 @@ name = "SEB"
 
 [vars]
 APP_URL = "https://origen-chat.moikapy.workers.dev"
+FROM_EMAIL = "Origen Chat <no_reply@moikapy.dev>"
