@@ -40,6 +40,7 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [model, setModel] = useState<string>("openrouter/free");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +76,13 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeSession?.messages]);
+
+  // Abort streaming on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const handleNewChat = useCallback(async () => {
     if (streaming) return;
@@ -115,6 +123,8 @@ export default function ChatPage() {
 
     const abort = new AbortController();
     abortRef.current = abort;
+    // Timeout after 60s if upstream hangs
+    const timeout = setTimeout(() => abort.abort(), 60_000);
 
     try {
       const auth = getAuthConfig();
@@ -195,14 +205,21 @@ export default function ChatPage() {
                 break;
               case "done":
                 await finalizeMessage({
+                  content: currentContent || undefined,
+                  reasoning: currentReasoning || undefined,
+                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
                   citations: event.citations,
                   usage: event.usage,
                   streaming: false,
                 });
                 break;
               case "error":
+                // Preserve any content that was already streamed before the error
+                const errorContent = currentContent
+                  ? `${currentContent}\n\n⚠️ Error: ${event.message}`
+                  : `Error: ${event.message}`;
                 await finalizeMessage({
-                  content: `Error: ${event.message}`,
+                  content: errorContent,
                   streaming: false,
                 });
                 break;
@@ -222,6 +239,7 @@ export default function ChatPage() {
         });
       }
     } finally {
+      clearTimeout(timeout);
       setStreaming(false);
       abortRef.current = null;
     }
@@ -243,6 +261,7 @@ export default function ChatPage() {
         onModelChange={setModel}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
       />
 
       {/* Main chat area */}
@@ -251,10 +270,17 @@ export default function ChatPage() {
         <header className="border-b border-border px-4 py-3">
           <div className="mx-auto max-w-3xl flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Mobile hamburger */}
+              {/* Sidebar toggle — mobile: overlay, desktop: collapse/expand */}
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  if (window.innerWidth < 1024) {
+                    setSidebarOpen(true);
+                  } else {
+                    setSidebarCollapsed(!sidebarCollapsed);
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 12h18M3 6h18M3 18h18" />

@@ -102,6 +102,13 @@ export function useSessions() {
   );
 
   // Update last message (debounced for streaming)
+  // Only updates local state immediately. DB write is debounced and
+  // does NOT trigger a full refresh — that would overwrite in-flight
+  // streaming state with stale DB data.
+  //
+  // IMPORTANT: The debounced write accumulates the latest local state
+  // at write time, not the partial from the event that scheduled it.
+  // This prevents partial data from overwriting accumulated content.
   const updateLastMessage = useCallback(
     (partial: Partial<SessionMessage>, overrideId?: string) => {
       const id = overrideId || activeId;
@@ -117,17 +124,23 @@ export function useSessions() {
         return { ...prev, messages, updatedAt: Date.now() };
       });
 
-      // Debounce DB write
+      // Debounce DB write — but write the LATEST local state, not the partial
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
         if (!id) return;
-        const session = await updateLastMessageInDB(id, partial);
-        if (session) {
-          await refreshList();
-        }
+        // Read current local state to get the accumulated content
+        setActiveSession((prev) => {
+          if (!prev || prev.messages.length === 0) return prev;
+          const lastMsg = prev.messages[prev.messages.length - 1];
+          // Fire-and-forget DB write with the FULL accumulated state
+          updateLastMessageInDB(id, lastMsg).catch(() => {
+            // Silently ignore — will be retried on finalize
+          });
+          return prev; // Don't change state, just borrow it
+        });
       }, 500);
     },
-    [activeId, refreshList],
+    [activeId],
   );
 
   // Finalize a message (immediate DB write, cancels debounce)

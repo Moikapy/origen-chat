@@ -16,6 +16,7 @@ interface SessionSidebarProps {
   onModelChange: (model: string) => void;
   open: boolean;
   onClose: () => void;
+  collapsed: boolean;
 }
 
 function relativeTime(ts: number): string {
@@ -145,6 +146,7 @@ export function SessionSidebar({
   onModelChange,
   open,
   onClose,
+  collapsed,
 }: SessionSidebarProps) {
   const { user } = useAuth();
   const grouped = groupSessions(sessions);
@@ -161,8 +163,10 @@ export function SessionSidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:relative top-0 left-0 h-screen lg:h-full z-50 w-72 bg-card border-r border-border flex flex-col transition-transform duration-200 ${
-          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        className={`fixed top-0 left-0 h-screen z-50 w-72 bg-card border-r border-border flex flex-col transition-all duration-200 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        } ${
+          collapsed ? "lg:hidden" : "lg:relative lg:h-full lg:translate-x-0"
         }`}
       >
         {/* Header: Brand + New */}
