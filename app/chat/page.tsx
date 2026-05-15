@@ -38,6 +38,7 @@ function ChatPageInner() {
     clearActive,
     editAndResend,
     updateSystemPrompt,
+    syncOnAuth,
   } = useSessions();
 
   const [streaming, setStreaming] = useState(false);
@@ -51,6 +52,12 @@ function ChatPageInner() {
     const m = searchParams.get("model");
     if (m) setModel(m);
   }, [searchParams]);
+
+  // Sync sessions from D1 when authenticated
+  useEffect(() => {
+    if (user?.id) syncOnAuth(user.id);
+  }, [user?.id]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);

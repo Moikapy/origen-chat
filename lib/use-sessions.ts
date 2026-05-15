@@ -13,6 +13,7 @@ import {
   appendMessage as appendMessageToDB,
   updateLastMessage as updateLastMessageInDB,
 } from "@/lib/session-store";
+import { pullSessions, mergeSessions, pushSession, deleteRemoteSession } from "@/lib/session-sync";
 
 export { type Session, type SessionMessage } from "@/lib/session-store";
 
@@ -36,6 +37,22 @@ export function useSessions() {
     const s = await listSessions();
     setSessions(s);
   }, []);
+
+  // Sync with server when authenticated — pull remote, merge with local
+  const syncOnAuth = useCallback(async (userId: string) => {
+    try {
+      const remote = await pullSessions();
+      if (remote.length === 0) return; // nothing to merge
+      const merged = mergeSessions(sessions, remote);
+      // Save merged sessions locally
+      for (const s of merged) {
+        await saveSession(s);
+      }
+      setSessions(merged);
+    } catch {
+      // Silently fail — local sessions still work
+    }
+  }, [sessions]);
 
   // Create a new session, save it, and switch to it
   const createNew = useCallback(
@@ -218,5 +235,6 @@ export function useSessions() {
     clearActive,
     editAndResend,
     updateSystemPrompt,
+    syncOnAuth,
   };
 }
