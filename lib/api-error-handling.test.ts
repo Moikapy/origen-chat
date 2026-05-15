@@ -55,7 +55,7 @@ describe("Response body reading pattern", () => {
     });
 
     // First read succeeds
-    const json = await res.json();
+    const json = (await res.json()) as { error: string };
     expect(json.error).toBe("test");
 
     // Second read fails — this is the bug we fixed
