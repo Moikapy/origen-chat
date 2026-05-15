@@ -144,11 +144,13 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
     <div className="mr-auto max-w-[100%] space-y-2 group/assistant relative">
       {/* Reasoning block */}
       {message.reasoning && (
-        <details className="group/reason">
+        <details className="group/reason" open={streaming}>
           <summary className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground py-1 px-2 rounded hover:bg-muted/50 transition-colors">
-            <span className="text-muted-foreground/60">⏳</span>
-            <span>Thinking...</span>
-            <span className="text-muted-foreground/50">({message.reasoning.length} chars)</span>
+            <span className="inline-block w-3 h-3 border-2 border-muted-foreground/40 border-t-primary rounded-full" style={streaming ? { animation: 'spin 0.6s linear infinite' } : {}} />
+            <span>{streaming ? "Thinking..." : "Reasoned"}</span>
+            {!streaming && message.reasoning && (
+              <span className="text-muted-foreground/50">({message.reasoning.trim().split(/\s+/).length} words)</span>
+            )}
           </summary>
           <div className="mt-1 p-2 rounded bg-muted/30 border border-border/50 text-xs text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
             {message.reasoning}
@@ -264,7 +266,7 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
       {/* Usage footer */}
       {message.usage && !message.streaming && (
         <div className="text-[11px] text-muted-foreground/50 px-1">
-          {message.usage.promptTokens}→{message.usage.completionTokens} tokens
+          {(message.usage.promptTokens ?? 0).toLocaleString()} in · {(message.usage.completionTokens ?? 0).toLocaleString()} out
           {message.usage.totalCost != null && message.usage.totalCost > 0 && ` · $${message.usage.totalCost.toFixed(4)}`}
         </div>
       )}

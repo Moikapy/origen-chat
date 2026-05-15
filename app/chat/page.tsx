@@ -9,20 +9,12 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { ChatMessage } from "@/components/chat-message";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { useSessions } from "@/lib/use-sessions";
+import { useChat, getAuthConfig, type ChatMessageInput } from "@/lib/use-chat";
 import type { SessionMessage } from "@/lib/session-store";
 import { useAuth } from "@/lib/auth";
 
-// Client-safe StreamEvent type
-type StreamEvent =
-  | { type: "reasoning"; content: string }
-  | { type: "tool_call"; name: string; args: Record<string, unknown> }
-  | { type: "tool_result"; name: string; result: string }
-  | { type: "text"; content: string }
-  | { type: "done"; message: string; citations: Array<{ book: string; chapter: number; verse: number }>; usage?: { promptTokens?: number; completionTokens?: number; totalCost?: number } }
-  | { type: "error"; message: string };
-
 function ChatPageInner() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const {
     sessions,
     activeId,
@@ -35,18 +27,28 @@ function ChatPageInner() {
     appendMessage,
     updateLastMessage,
     finalizeMessage,
-    clearActive,
     editAndResend,
     updateSystemPrompt,
     syncOnAuth,
     regenerateLastResponse,
   } = useSessions();
-  const sessionsLoading = loading;
 
-  const [streaming, setStreaming] = useState(false);
-  const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
-  const [streamElapsed, setStreamElapsed] = useState(0);
   const [model, setModel] = useState<string>("openrouter/free");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const messages = activeSession?.messages ?? [];
+
+  // Chat hook — handles streaming, SSE parsing, abort
+  const { streaming, streamElapsed, sendMessage: chatSendMessage, stop } = useChat({
+    model,
+    systemPrompt: activeSession?.systemPrompt,
+    appendMessage: async (msg, sid) => { appendMessage(msg, sid); },
+    updateLastMessage: async (updates, sid) => { updateLastMessage(updates, sid); },
+    finalizeMessage: async (updates, sid) => { finalizeMessage(updates, sid); },
+  });
 
   // Read model from URL search params (deep link from models page)
   const searchParams = useSearchParams();
@@ -60,16 +62,9 @@ function ChatPageInner() {
     if (user?.id) syncOnAuth(user.id);
   }, [user?.id]);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
   // Sync model from active session when switching
   useEffect(() => {
-    if (activeSession?.model) {
-      setModel(activeSession.model);
-    }
+    if (activeSession?.model) setModel(activeSession.model);
   }, [activeSession?.model]);
 
   // Force free models for logged-out users
@@ -79,6 +74,7 @@ function ChatPageInner() {
     }
   }, [user]);
 
+  // Editor
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false }),
@@ -93,66 +89,36 @@ function ChatPageInner() {
     },
   });
 
-  // Auto-scroll to bottom on new messages
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Auto-scroll: smooth for new messages, instant during streaming
-  // Only scroll if user is near bottom (within 150px)
+  // Smart auto-scroll: only scroll if user is near bottom (<150px)
+  const [showScrollFab, setShowScrollFab] = useState(false);
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-    if (!nearBottom && messages.length > 0) return; // user scrolled up, don't force
-    messagesEndRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth" });
-  }, [activeSession?.messages, streaming]);
-
-  // Streaming timer
-  useEffect(() => {
-    if (!streaming) {
-      setStreamStartTime(null);
-      setStreamElapsed(0);
-      return;
+    setShowScrollFab(!nearBottom && (activeSession?.messages?.length ?? 0) > 0);
+    if (nearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth" });
     }
-    setStreamStartTime(Date.now());
-    const interval = setInterval(() => {
-      setStreamElapsed(Math.round((Date.now() - (streamStartTime || Date.now())) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [streaming]);
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeSession?.messages]);
-
-  // Abort streaming on unmount
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  }, [activeSession?.messages, streaming]);
 
   const handleNewChat = useCallback(async () => {
     if (streaming) return;
-    const session = await createNew(model);
-    // sidebar stays as-is, just switches to new session
+    await createNew(model);
   }, [createNew, model, streaming]);
+
 
   // Keyboard shortcuts
   const [showShortcuts, setShowShortcuts] = useState(false);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + Shift + N = New chat
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "n") {
         e.preventDefault();
         handleNewChat();
       }
-      // Escape = close/collapse sidebar
       if (e.key === "Escape") {
         if (sidebarOpen) setSidebarOpen(false);
         else setSidebarCollapsed(!sidebarCollapsed);
       }
-      // Ctrl/Cmd + / = Show shortcuts
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         setShowShortcuts(true);
@@ -163,18 +129,18 @@ function ChatPageInner() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleNewChat, sidebarOpen, sidebarCollapsed]);
 
-  const sendMessage = useCallback(async () => {
+  // Send a new message
+  const handleSend = useCallback(async () => {
     if (!editor || streaming) return;
     const text = editor.getText();
     if (!text.trim()) return;
 
-    // Ensure we have an active session — use local ID if React state hasn't caught up
     let sessionId = activeId;
     let currentMessages = activeSession?.messages ?? [];
     if (!sessionId) {
       const session = await createNew(model);
       sessionId = session.id;
-      currentMessages = session.messages; // fresh session, empty messages
+      currentMessages = session.messages;
     }
 
     const userMsg: SessionMessage = {
@@ -185,405 +151,68 @@ function ChatPageInner() {
     await appendMessage(userMsg, sessionId);
     editor.commands.clearContent();
 
-    setStreaming(true);
-    const assistantMsg: SessionMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      streaming: true,
-    };
-    await appendMessage(assistantMsg, sessionId);
+    const chatMessages: ChatMessageInput[] = [...currentMessages, userMsg].map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    await chatSendMessage(chatMessages, sessionId);
 
-    const abort = new AbortController();
-    abortRef.current = abort;
-    // Timeout after 60s if upstream hangs
-    const timeout = setTimeout(() => abort.abort(), 60_000);
-
-    try {
-      const auth = getAuthConfig();
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...currentMessages, userMsg].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          model,
-          wiki: true,
-          systemPrompt: activeSession?.systemPrompt || undefined,
-          ...auth,
-        }),
-        signal: abort.signal,
-      });
-
-      if (!res.ok) {
-        let errMsg = `Request failed (${res.status})`;
-        try {
-          const text = await res.text();
-          const parsed = JSON.parse(text) as { error?: string };
-          errMsg = parsed.error || errMsg;
-        } catch { /* not JSON, use default */ }
-        await finalizeMessage({ content: errMsg, streaming: false }, sessionId);
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) return;
-
-      let buffer = "";
-      let currentReasoning = "";
-      let currentContent = "";
-      let currentToolCalls: SessionMessage["toolCalls"] = [];
-      let currentToolName = "";
-      let currentToolArgs: Record<string, unknown> = {};
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            const event: StreamEvent = JSON.parse(data);
-            switch (event.type) {
-              case "reasoning":
-                currentReasoning += event.content;
-                updateLastMessage({ reasoning: currentReasoning }, sessionId);
-                break;
-              case "text":
-                currentContent += event.content;
-                updateLastMessage({
-                  content: currentContent,
-                }, sessionId);
-                break;
-              case "tool_call":
-                currentToolName = event.name;
-                currentToolArgs = event.args;
-                break;
-              case "tool_result":
-                currentToolCalls = [
-                  ...(currentToolCalls ?? []),
-                  { name: currentToolName, args: currentToolArgs, result: event.result },
-                ];
-                updateLastMessage({ toolCalls: currentToolCalls }, sessionId);
-                break;
-              case "done":
-                await finalizeMessage({
-                  content: currentContent || undefined,
-                  reasoning: currentReasoning || undefined,
-                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
-                  citations: event.citations,
-                  usage: event.usage,
-                  streaming: false,
-                }, sessionId);
-                break;
-              case "error":
-                // Preserve any content that was already streamed before the error
-                const errorContent = currentContent
-                  ? `${currentContent}\n\n${event.message}`
-                  : event.message;
-                await finalizeMessage({
-                  content: errorContent,
-                  streaming: false,
-                  isError: true,
-                }, sessionId);
-                break;
-            }
-          } catch {
-            /* skip malformed SSE */
-          }
-        }
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // User cancelled
-      } else {
-        await finalizeMessage({
-          content: err instanceof Error ? err.message : "Unknown error",
-          streaming: false,
-          isError: true,
-        }, sessionId);
-      }
-    } finally {
-      clearTimeout(timeout);
-      setStreaming(false);
-      abortRef.current = null;
+    // Auto-title: rename "New chat" sessions after first assistant response
+    const title = text.trim().substring(0, 50);
+    if (title && activeSession?.title === "New chat") {
+      rename(sessionId, title);
     }
-  }, [editor, streaming, model, activeId, activeSession, appendMessage, updateLastMessage, finalizeMessage, createNew]);
+  }, [editor, streaming, activeId, activeSession, model, createNew, appendMessage, chatSendMessage]);
 
+  // Edit a message and resend
   const handleEditAndResend = useCallback(async (editIndex: number, newContent: string) => {
     if (streaming || !activeId) return;
-
-    // Truncate messages and update the edited user message
     const updated = await editAndResend(editIndex, newContent);
     if (!updated) return;
 
-    // Now resend from that point
-    setStreaming(true);
-    const assistantMsg: SessionMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      streaming: true,
-    };
-    await appendMessage(assistantMsg, activeId);
+    const chatMessages: ChatMessageInput[] = updated.messages.map((m: SessionMessage) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    await chatSendMessage(chatMessages, activeId);
+  }, [streaming, activeId, editAndResend, chatSendMessage]);
 
-    const abort = new AbortController();
-    abortRef.current = abort;
-    const timeout = setTimeout(() => abort.abort(), 60_000);
-
-    try {
-      const auth = getAuthConfig();
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: updated.messages.map((m: SessionMessage) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          model,
-          wiki: true,
-          systemPrompt: activeSession?.systemPrompt || undefined,
-          ...auth,
-        }),
-        signal: abort.signal,
-      });
-
-      if (!res.ok) {
-        let errMsg = `Request failed (${res.status})`;
-        try { const t = await res.text(); const p = JSON.parse(t) as { error?: string }; errMsg = p.error || errMsg; } catch { /* */ }
-        await finalizeMessage({ content: errMsg, streaming: false }, activeId);
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) return;
-
-      let buffer = "";
-      let currentReasoning = "";
-      let currentContent = "";
-      let currentToolCalls: SessionMessage["toolCalls"] = [];
-      let currentToolName = "";
-      let currentToolArgs: Record<string, unknown> = {};
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-          try {
-            const event: StreamEvent = JSON.parse(data);
-            switch (event.type) {
-              case "reasoning":
-                currentReasoning += event.content;
-                updateLastMessage({ reasoning: currentReasoning }, activeId);
-                break;
-              case "text":
-                currentContent += event.content;
-                updateLastMessage({ content: currentContent }, activeId);
-                break;
-              case "tool_call":
-                currentToolName = event.name;
-                currentToolArgs = event.args;
-                break;
-              case "tool_result":
-                currentToolCalls = [
-                  ...(currentToolCalls ?? []),
-                  { name: currentToolName, args: currentToolArgs, result: event.result },
-                ];
-                updateLastMessage({ toolCalls: currentToolCalls }, activeId);
-                break;
-              case "done":
-                await finalizeMessage({
-                  content: currentContent || undefined,
-                  reasoning: currentReasoning || undefined,
-                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
-                  citations: event.citations,
-                  usage: event.usage,
-                  streaming: false,
-                }, activeId);
-                break;
-              case "error":
-                const errorContent = currentContent
-                  ? `${currentContent}\n\n${event.message}`
-                  : event.message;
-                await finalizeMessage({ content: errorContent, streaming: false, isError: true }, activeId);
-                break;
-            }
-          } catch { /* skip */ }
-        }
-      }
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === "AbortError")) {
-        await finalizeMessage({
-          content: err instanceof Error ? err.message : "Unknown error",
-          streaming: false,
-          isError: true,
-        }, activeId);
-      }
-    } finally {
-      clearTimeout(timeout);
-      setStreaming(false);
-      abortRef.current = null;
-    }
-  }, [streaming, activeId, model, editAndResend, appendMessage, updateLastMessage, finalizeMessage]);
-
-  // Regenerate last assistant response
+  // Regenerate last response
   const handleRegenerate = useCallback(async () => {
     if (streaming || !activeId) return;
-
     const updated = await regenerateLastResponse();
     if (!updated) return;
 
-    setStreaming(true);
-    const assistantMsg: SessionMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      streaming: true,
-    };
-    await appendMessage(assistantMsg, activeId);
+    const chatMessages: ChatMessageInput[] = updated.messages.map((m: SessionMessage) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    await chatSendMessage(chatMessages, activeId);
+  }, [streaming, activeId, regenerateLastResponse, chatSendMessage]);
 
-    const abort = new AbortController();
-    abortRef.current = abort;
-    const timeout = setTimeout(() => abort.abort(), 60_000);
-
-    try {
-      const auth = getAuthConfig();
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: updated.messages.map((m: SessionMessage) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          model,
-          wiki: true,
-          systemPrompt: activeSession?.systemPrompt || undefined,
-          ...auth,
-        }),
-        signal: abort.signal,
-      });
-
-      if (!res.ok) {
-        let errMsg = "Request failed (" + res.status + ")";
-        try {
-          const text = await res.text();
-          const parsed = JSON.parse(text) as { error?: string };
-          errMsg = parsed.error || errMsg;
-        } catch { /* not JSON, use default */ }
-        await finalizeMessage({ content: errMsg, streaming: false, isError: true }, activeId);
-        return;
+  // Export chat as markdown
+  const handleExport = useCallback(() => {
+    if (!activeSession) return;
+    const title = activeSession.title || "Chat";
+    const lines = [`# ${title}`, ""];
+    for (const msg of messages) {
+      if (msg.role === "user") {
+        lines.push(`**User:** ${msg.content}`);
+      } else if (msg.role === "assistant") {
+        if (msg.reasoning) lines.push(`*Reasoning:* ${msg.reasoning}`, "");
+        lines.push(`**Assistant:** ${msg.content}`);
       }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) return;
-
-      let buffer = "";
-      let currentReasoning = "";
-      let currentContent = "";
-      let currentToolCalls: SessionMessage["toolCalls"] = [];
-      let currentToolName = "";
-      let currentToolArgs: Record<string, unknown> = {};
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            const event: StreamEvent = JSON.parse(data);
-            switch (event.type) {
-              case "reasoning":
-                currentReasoning += event.content;
-                updateLastMessage({ reasoning: currentReasoning }, activeId);
-                break;
-              case "text":
-                currentContent += event.content;
-                updateLastMessage({ content: currentContent }, activeId);
-                break;
-              case "tool_call":
-                currentToolName = event.name;
-                currentToolArgs = event.args;
-                break;
-              case "tool_result":
-                currentToolCalls = [
-                  ...(currentToolCalls ?? []),
-                  { name: currentToolName, args: currentToolArgs, result: event.result },
-                ];
-                updateLastMessage({ toolCalls: currentToolCalls }, activeId);
-                break;
-              case "done":
-                await finalizeMessage({
-                  content: currentContent || undefined,
-                  reasoning: currentReasoning || undefined,
-                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
-                  citations: event.citations,
-                  usage: event.usage,
-                  streaming: false,
-                }, activeId);
-                break;
-              case "error":
-                const errorContent = currentContent
-                  ? currentContent + "\n\n" + event.message
-                  : event.message;
-                await finalizeMessage({
-                  content: errorContent,
-                  streaming: false,
-                  isError: true,
-                }, activeId);
-                break;
-            }
-          } catch {
-            /* skip malformed SSE */
-          }
-        }
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // User cancelled
-      } else {
-        await finalizeMessage({
-          content: err instanceof Error ? err.message : "Unknown error",
-          streaming: false,
-          isError: true,
-        }, activeId);
-      }
-    } finally {
-      clearTimeout(timeout);
-      setStreaming(false);
-      abortRef.current = null;
+      lines.push("");
     }
-  }, [streaming, activeId, model, activeSession, regenerateLastResponse, appendMessage, updateLastMessage, finalizeMessage]);
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeSession, messages]);
 
-  const messages = activeSession?.messages ?? [];
 
   return (
     <div className="h-dvh bg-background text-foreground flex overflow-hidden">
@@ -593,7 +222,7 @@ function ChatPageInner() {
         activeId={activeId}
         activeModel={model}
         systemPrompt={activeSession?.systemPrompt}
-        loading={sessionsLoading}
+        loading={loading}
         onSelect={switchTo}
         onDelete={remove}
         onRename={rename}
@@ -613,14 +242,10 @@ function ChatPageInner() {
         <header className="border-b border-border px-4 py-3">
           <div className="mx-auto max-w-3xl flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Sidebar toggle — mobile: overlay, desktop: collapse/expand */}
               <button
                 onClick={() => {
-                  if (window.innerWidth < 1024) {
-                    setSidebarOpen(true);
-                  } else {
-                    setSidebarCollapsed(!sidebarCollapsed);
-                  }
+                  if (window.innerWidth < 1024) setSidebarOpen(true);
+                  else setSidebarCollapsed(!sidebarCollapsed);
                 }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
@@ -634,19 +259,11 @@ function ChatPageInner() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleNewChat}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                title="New chat"
-              >
-                New
-              </button>
-              <Link
-                href="/settings"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Settings
-              </Link>
+              <button onClick={handleNewChat} className="text-sm text-muted-foreground hover:text-foreground transition-colors">New</button>
+              {messages.length > 0 && (
+                <button onClick={handleExport} className="text-sm text-muted-foreground hover:text-foreground transition-colors" title="Export chat as markdown">Export</button>
+              )}
+              <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
             </div>
           </div>
         </header>
@@ -662,9 +279,7 @@ function ChatPageInner() {
                   {user ? (
                     `Signed in as ${user.email}`
                   ) : (
-                    <Link href="/auth/login" className="text-primary hover:underline">
-                      Sign in
-                    </Link>
+                    <Link href="/auth/login" className="text-primary hover:underline">Sign in</Link>
                   )}{" "}
                   for your provider settings.
                 </p>
@@ -691,17 +306,30 @@ function ChatPageInner() {
                 <span className="text-sm">Thinking...</span>
               </div>
             )}
+            {showScrollFab && (
+              <button
+                onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
+                className="fixed bottom-24 right-8 z-10 bg-card border border-border rounded-full p-2 shadow-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                title="Scroll to bottom"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12l7 7 7-7" />
+                </svg>
+              </button>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </main>
 
-        {/* Input */}
+        {/* Streaming status bar */}
         {streaming && (
           <div className="px-4 py-1 border-t border-border/50 text-[11px] text-muted-foreground flex items-center gap-2">
             <span className="animate-pulse text-primary">●</span>
             <span>Streaming... {streamElapsed}s</span>
           </div>
         )}
+
+        {/* Input */}
         <footer className="border-t border-border px-4 py-3 safe-bottom">
           <div className="mx-auto max-w-3xl">
             <div
@@ -709,7 +337,7 @@ function ChatPageInner() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  sendMessage();
+                  handleSend();
                 }
               }}
             >
@@ -719,14 +347,18 @@ function ChatPageInner() {
               <div className="flex-shrink-0">
                 {streaming ? (
                   <button
-                    onClick={() => abortRef.current?.abort()}
-                    className="text-sm px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors"
+                    onClick={stop}
+                    className="text-sm px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors flex items-center gap-2"
                   >
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
                     Stop
                   </button>
                 ) : (
                   <button
-                    onClick={sendMessage}
+                    onClick={handleSend}
                     disabled={!editor?.getText().trim()}
                     className="text-sm px-4 py-2 rounded-md bg-foreground text-background hover:opacity-90 transition-colors disabled:opacity-30"
                   >
@@ -756,19 +388,6 @@ function ChatPageInner() {
   );
 }
 
-/** Get auth config from localStorage (Ollama) — OpenRouter auth is via encrypted cookie */
-function getAuthConfig(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const stored = localStorage.getItem("origen_ollama_config");
-  if (!stored) return {};
-  try {
-    const config = JSON.parse(stored);
-    if (config.baseUrl) return { ollamaBaseUrl: config.baseUrl, ollamaApiKey: config.apiKey || "" };
-    return {};
-  } catch {
-    return {};
-  }
-}
 import { Suspense } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 
