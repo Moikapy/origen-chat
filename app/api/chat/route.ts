@@ -65,6 +65,7 @@ async function handleChatRequest(request: Request): Promise<Response> {
   if (d1) {
     await ensureRateLimitTable(d1);
     let hasAuthKey = !!(body.ollamaApiKey);
+    let userId: string | null = null;
     try {
       if (env.OPENROUTER_ENCRYPT_KEY) {
         const ck = await getApiKeyFromCookie({
@@ -72,9 +73,11 @@ async function handleChatRequest(request: Request): Promise<Response> {
           previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
         });
         hasAuthKey = !!(ck || body.ollamaApiKey);
+        // Use API key prefix as user identifier (unique per OAuth session)
+        if (ck) userId = "u-" + ck.substring(0, 8);
       }
     } catch { /* cookies() unavailable, treat as unauthenticated */ }
-    const rateResult = await checkRateLimit(d1, ip, hasAuthKey);
+    const rateResult = await checkRateLimit(d1, ip, hasAuthKey, userId);
     if (!rateResult.allowed) {
       const retryAfterSec = Math.ceil((rateResult.resetAt - Date.now()) / 1000);
       return new Response(

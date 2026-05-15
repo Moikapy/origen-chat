@@ -169,13 +169,15 @@ export interface RateLimitResult {
 }
 
 /**
- * Per-IP rate limiter using D1.
- * Uses a sliding window: counts requests in the last RATE_LIMIT_WINDOW_MS.
+ * Per-user/IP rate limiter using D1.
+ * Authenticated users: rate limited by user_id (higher limit).
+ * Anonymous users: rate limited by IP (lower limit).
  */
 export async function checkRateLimit(
   d1: any,
   ip: string,
   authenticated: boolean,
+  userId?: string | null,
 ): Promise<RateLimitResult> {
   const now = Date.now();
   const windowStart = now - RATE_LIMIT_WINDOW_MS;
@@ -186,10 +188,14 @@ export async function checkRateLimit(
     "DELETE FROM rate_limits WHERE window_start < ?1"
   ).bind(windowStart).run();
 
-  // Count recent requests from this IP
-  const count = await d1.prepare(
-    "SELECT COUNT(*) as cnt FROM rate_limits WHERE ip = ?1 AND window_start > ?2"
-  ).bind(ip, windowStart).first();
+  // Count: prefer user_id for authenticated users, else fall back to IP
+  const count = userId
+    ? await d1.prepare(
+        "SELECT COUNT(*) as cnt FROM rate_limits WHERE user_id = ?1 AND window_start > ?2"
+      ).bind(userId, windowStart).first()
+    : await d1.prepare(
+        "SELECT COUNT(*) as cnt FROM rate_limits WHERE ip = ?1 AND window_start > ?2"
+      ).bind(ip, windowStart).first();
 
   const currentCount = (count as any)?.cnt ?? 0;
 
@@ -201,10 +207,10 @@ export async function checkRateLimit(
     };
   }
 
-  // Record this request
+  // Record this request with both ip and user_id
   await d1.prepare(
-    "INSERT INTO rate_limits (ip, window_start) VALUES (?1, ?2)"
-  ).bind(ip, now).run();
+    "INSERT INTO rate_limits (ip, user_id, window_start) VALUES (?1, ?2, ?3)"
+  ).bind(ip, userId || null, now).run();
 
   return {
     allowed: true,
@@ -215,6 +221,7 @@ export async function checkRateLimit(
 
 /** Create the rate_limits table if it doesn't exist */
 export async function ensureRateLimitTable(d1: any): Promise<void> {
-  await d1.exec("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, window_start INTEGER NOT NULL)");
+  await d1.exec("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL)");
   await d1.exec("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)");
+  await d1.exec("CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, window_start)").catch(() => {});
 }
