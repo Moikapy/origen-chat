@@ -1,5 +1,33 @@
 # AGENTS.md
 
+## Iron Suit 🦾
+
+**One skill. Full pipeline. Ship faster.**
+
+When building features, fixing bugs, or implementing changes, activate the `iron-suit` skill. It orchestrates the entire development lifecycle:
+
+| Phase | Skill | When |
+|-------|-------|------|
+| 0. Brainstorm | `brainstorming` | Vague idea |
+| 1. Spec | `kapy-spec` | New feature/major change |
+| 2. Plan | `writing-plans` | Multi-step implementation |
+| 3. TDD Build | `test-driven-development`, `systematic-debugging` | Always |
+| 4. QA Review | `qa-review` | Before shipping |
+| 5. Ship | `verification-before-completion` | Always |
+
+**How to use:** Say "suit up", "iron suit", "let's build this", or describe what you want to implement. The skill assesses which phases are needed and skips what's unnecessary.
+
+- **Bug fix (cause known)?** Skip to Phase 3 (TDD Build)
+- **Bug fix (cause unknown)?** Phase 3 + `systematic-debugging`
+- **Small feature (1-2 files)?** Skip to Phase 3 with brief plan
+- **Medium feature?** Phase 1 (Spec) or Phase 2 (Plan)
+- **Large feature?** Start at Phase 0 (Brainstorm)
+- **Code review only?** Phase 4 (QA Review)
+
+Additional skills available as-needed: `programming-philosophy` (code quality principles), `dispatching-parallel-agents` (concurrent tasks), `context-mode` (large output processing).
+
+---
+
 ## Codebase Wiki
 
 This project has an auto-maintained knowledge base at `.codebase-wiki/`.
