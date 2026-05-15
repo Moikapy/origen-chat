@@ -150,6 +150,7 @@ export default function ChatPage() {
 
       let buffer = "";
       let currentReasoning = "";
+      let currentContent = "";
       let currentToolCalls: SessionMessage["toolCalls"] = [];
       let currentToolName = "";
       let currentToolArgs: Record<string, unknown> = {};
@@ -175,8 +176,9 @@ export default function ChatPage() {
                 updateLastMessage({ reasoning: currentReasoning });
                 break;
               case "text":
+                currentContent += event.content;
                 updateLastMessage({
-                  content: (activeSession?.messages[activeSession.messages.length - 1]?.content ?? "") + event.content,
+                  content: currentContent,
                 });
                 break;
               case "tool_call":
@@ -261,22 +263,7 @@ export default function ChatPage() {
                 <Link href="/chat" className="hover:opacity-80 transition-opacity">Origen Chat</Link>
               </h1>
             </div>
-            <div className="flex items-center gap-3">
-              {user ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>
-                  <button
-                    onClick={logout}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <Link href="/auth/login" className="text-sm text-primary hover:underline">
-                  Sign in
-                </Link>
-              )}
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleNewChat}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
