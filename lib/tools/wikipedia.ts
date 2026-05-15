@@ -3,8 +3,14 @@ import type { OrigenTool } from "@moikapy/origen";
 /**
  * Wikipedia lookup tool for Origen agents.
  * Searches Wikipedia and returns article summaries.
+ *
+ * Uses the MediaWiki action API with proper User-Agent header,
+ * which works from server-side (Cloudflare Workers) environments.
+ * The REST API (/api/rest_v1/) blocks server-side requests.
  */
 export function createWikipediaTool(): OrigenTool {
+  const USER_AGENT = "OrigenChat/1.0 (https://origen-chat.moikapy.workers.dev)";
+
   return {
     name: "wikipedia_lookup",
     description:
@@ -27,52 +33,66 @@ export function createWikipediaTool(): OrigenTool {
       const query = args.query as string;
       const sentences = (args.sentences as number) ?? 5;
       try {
-        // Step 1: Search Wikipedia
-        const searchUrl = new URL("https://en.wikipedia.org/w/api.php");
-        searchUrl.searchParams.set("action", "opensearch");
-        searchUrl.searchParams.set("search", query);
-        searchUrl.searchParams.set("limit", "5");
-        searchUrl.searchParams.set("format", "json");
-        searchUrl.searchParams.set("origin", "*");
+        // Use the MediaWiki action API with extracts — works server-side with User-Agent
+        const url = new URL("https://en.wikipedia.org/w/api.php");
+        url.searchParams.set("action", "query");
+        url.searchParams.set("list", "search");
+        url.searchParams.set("srsearch", query);
+        url.searchParams.set("srlimit", "1");
+        url.searchParams.set("format", "json");
 
-        const searchRes = await fetch(searchUrl.toString());
-        if (!searchRes.ok) return `Error searching Wikipedia: ${searchRes.statusText}`;
+        const searchRes = await fetch(url.toString(), {
+          headers: { "User-Agent": USER_AGENT },
+        });
+        if (!searchRes.ok) return `Error searching Wikipedia: ${searchRes.status} ${searchRes.statusText}`;
 
-        const searchData = await searchRes.json() as [string, string[], string[], string[]];
-        const titles = searchData[1];
-        if (!titles || titles.length === 0) {
+        const searchData = await searchRes.json() as {
+          query?: { search?: Array<{ title: string; snippet?: string }> };
+        };
+        const results = searchData.query?.search;
+        if (!results || results.length === 0) {
           return `No Wikipedia articles found for "${query}".`;
         }
 
-        // Step 2: Get summary of best match
-        const bestMatch = titles[0];
-        const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestMatch)}`;
-        const summaryRes = await fetch(summaryUrl);
-        if (!summaryRes.ok) return `Error fetching Wikipedia summary for "${bestMatch}".`;
+        const title = results[0].title;
 
-        const summary = await summaryRes.json() as {
-          title?: string;
-          extract?: string;
-          description?: string;
-          url?: string;
+        // Get the article extract using the query+extracts module
+        const extractUrl = new URL("https://en.wikipedia.org/w/api.php");
+        extractUrl.searchParams.set("action", "query");
+        extractUrl.searchParams.set("titles", title);
+        extractUrl.searchParams.set("prop", "extracts");
+        extractUrl.searchParams.set("exintro", "1");
+        extractUrl.searchParams.set("explaintext", "1");
+        extractUrl.searchParams.set("format", "json");
+        extractUrl.searchParams.set("redirects", "1");
+
+        const extractRes = await fetch(extractUrl.toString(), {
+          headers: { "User-Agent": USER_AGENT },
+        });
+        if (!extractRes.ok) return `Error fetching Wikipedia article for "${title}".`;
+
+        const extractData = await extractRes.json() as {
+          query?: { pages?: Record<string, { title?: string; extract?: string }> };
         };
 
-        if (!summary.extract) {
-          return `Wikipedia article "${bestMatch}" has no summary available.`;
-        }
+        const pages = extractData.query?.pages;
+        if (!pages) return `Wikipedia article "${title}" has no content available.`;
 
-        // Step 3: Truncate to sentences
-        const allSentences = summary.extract.split(/(?<=[.!?])\s+/);
+        const page = Object.values(pages)[0];
+        const extract = page?.extract;
+        if (!extract) return `Wikipedia article "${title}" has no summary available.`;
+
+        // Truncate to requested number of sentences
+        const allSentences = extract.split(/(?<=[.!?])\s+/);
         const truncated = allSentences.slice(0, sentences).join(" ");
 
         return [
-          `**${summary.title ?? bestMatch}**`,
-          summary.description ? `*${summary.description}*` : "",
+          `**${page?.title ?? title}**`,
           "",
           truncated,
-          allSentences.length > sentences ? `... (${allSentences.length - sentences} more sentences)` : "",
+          allSentences.length > sentences ? `... (${allSentences.length - sentences} more sentences available)` : "",
           "",
-          `Source: ${summary.url ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(bestMatch)}`}`,
+          `Source: https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`,
         ]
           .filter(Boolean)
           .join("\n");
