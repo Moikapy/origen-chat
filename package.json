@@ -54,5 +54,9 @@
     "typescript": "^5.8.0",
     "vitest": "^4.1.6",
     "wrangler": "^4.14.0"
+  },
+  "overrides": {
+    "@mariozechner/pi-ai": "npm:@earendil-works/pi-ai@0.74.0",
+    "@mariozechner/pi-agent-core": "npm:@earendil-works/pi-agent-core@0.74.0"
   }
 }
