@@ -73,7 +73,7 @@ function SessionItem({
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmTimer = useRef<number | null>(null);
 
   const handleDelete = () => {
     if (confirmDelete) {
@@ -81,7 +81,7 @@ function SessionItem({
       onDelete();
     } else {
       setConfirmDelete(true);
-      confirmTimer.current = setTimeout(() => setConfirmDelete(false), 3000);
+      confirmTimer.current = window.setTimeout(() => setConfirmDelete(false), 3000);
     }
   };
 
