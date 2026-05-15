@@ -89,9 +89,10 @@ export function useSessions() {
 
   // Append a message and auto-title
   const appendMessage = useCallback(
-    async (message: SessionMessage) => {
-      if (!activeId) return;
-      const session = await appendMessageToDB(activeId, message);
+    async (message: SessionMessage, overrideId?: string) => {
+      const id = overrideId || activeId;
+      if (!id) return;
+      const session = await appendMessageToDB(id, message);
       if (session) {
         setActiveSession(session);
         await refreshList();
@@ -102,8 +103,9 @@ export function useSessions() {
 
   // Update last message (debounced for streaming)
   const updateLastMessage = useCallback(
-    (partial: Partial<SessionMessage>) => {
-      if (!activeId) return;
+    (partial: Partial<SessionMessage>, overrideId?: string) => {
+      const id = overrideId || activeId;
+      if (!id) return;
       // Update local state immediately for responsiveness
       setActiveSession((prev) => {
         if (!prev || prev.messages.length === 0) return prev;
@@ -118,8 +120,8 @@ export function useSessions() {
       // Debounce DB write
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
-        if (!activeId) return;
-        const session = await updateLastMessageInDB(activeId, partial);
+        if (!id) return;
+        const session = await updateLastMessageInDB(id, partial);
         if (session) {
           await refreshList();
         }
@@ -130,10 +132,11 @@ export function useSessions() {
 
   // Finalize a message (immediate DB write, cancels debounce)
   const finalizeMessage = useCallback(
-    async (partial: Partial<SessionMessage>) => {
-      if (!activeId) return;
+    async (partial: Partial<SessionMessage>, overrideId?: string) => {
+      const id = overrideId || activeId;
+      if (!id) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      const session = await updateLastMessageInDB(activeId, partial);
+      const session = await updateLastMessageInDB(id, partial);
       if (session) {
         setActiveSession(session);
         await refreshList();

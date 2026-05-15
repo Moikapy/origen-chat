@@ -87,11 +87,13 @@ export default function ChatPage() {
     const text = editor.getText();
     if (!text.trim()) return;
 
-    // Ensure we have an active session
+    // Ensure we have an active session — use local ID if React state hasn't caught up
     let sessionId = activeId;
+    let currentMessages = activeSession?.messages ?? [];
     if (!sessionId) {
       const session = await createNew(model);
       sessionId = session.id;
+      currentMessages = session.messages; // fresh session, empty messages
     }
 
     const userMsg: SessionMessage = {
@@ -99,7 +101,7 @@ export default function ChatPage() {
       role: "user",
       content: text.trim(),
     };
-    await appendMessage(userMsg);
+    await appendMessage(userMsg, sessionId);
     editor.commands.clearContent();
 
     setStreaming(true);
@@ -109,14 +111,13 @@ export default function ChatPage() {
       content: "",
       streaming: true,
     };
-    await appendMessage(assistantMsg);
+    await appendMessage(assistantMsg, sessionId);
 
     const abort = new AbortController();
     abortRef.current = abort;
 
     try {
       const auth = getAuthConfig();
-      const currentMessages = activeSession?.messages ?? [];
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
