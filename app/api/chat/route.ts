@@ -34,6 +34,18 @@ async function getEnv(): Promise<Record<string, string | undefined>> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    return await handleChatRequest(request);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return new Response(
+      JSON.stringify({ error: msg }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+async function handleChatRequest(request: Request): Promise<Response> {
   const body: ChatRequest = await request.json();
 
   // ── Input validation ──
@@ -52,11 +64,16 @@ export async function POST(request: Request): Promise<Response> {
   const d1 = (env as Record<string, unknown>).DB as any;
   if (d1) {
     await ensureRateLimitTable(d1);
-    const cookieApiKey = await getApiKeyFromCookie({
-      encryptKey: env.OPENROUTER_ENCRYPT_KEY!,
-      previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
-    });
-    const hasAuthKey = !!(cookieApiKey || body.ollamaApiKey);
+    let hasAuthKey = !!(body.ollamaApiKey);
+    try {
+      if (env.OPENROUTER_ENCRYPT_KEY) {
+        const ck = await getApiKeyFromCookie({
+          encryptKey: env.OPENROUTER_ENCRYPT_KEY,
+          previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
+        });
+        hasAuthKey = !!(ck || body.ollamaApiKey);
+      }
+    } catch { /* cookies() unavailable, treat as unauthenticated */ }
     const rateResult = await checkRateLimit(d1, ip, hasAuthKey);
     if (!rateResult.allowed) {
       const retryAfterSec = Math.ceil((rateResult.resetAt - Date.now()) / 1000);
@@ -81,10 +98,17 @@ export async function POST(request: Request): Promise<Response> {
   const apiModel = stripOpenrouterPrefix(model);
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
-  const cookieApiKey = await getApiKeyFromCookie({
-    encryptKey: env.OPENROUTER_ENCRYPT_KEY!,
-    previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
-  });
+  let cookieApiKey: string | null = null;
+  try {
+    if (env.OPENROUTER_ENCRYPT_KEY) {
+      cookieApiKey = await getApiKeyFromCookie({
+        encryptKey: env.OPENROUTER_ENCRYPT_KEY,
+        previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
+      });
+    }
+  } catch {
+    // Cookie decryption failed or cookies() unavailable — treat as no user key
+  }
 
   // 2. Try client-passed Ollama key
   const userKey = cookieApiKey || ollamaApiKey || "";
