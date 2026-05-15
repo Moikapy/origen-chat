@@ -24,6 +24,13 @@ When building features, fixing bugs, or implementing changes, activate the `iron
 - **Large feature?** Start at Phase 0 (Brainstorm)
 - **Code review only?** Phase 4 (QA Review)
 
+### The 4 Rules (Non-Negotiable)
+
+1. **Think Before Coding** — No silent assumptions. State what you're assuming. Surface tradeoffs. Ask before guessing. Push back when a simpler approach exists.
+2. **Simplicity First** — Minimum code that solves the problem. No speculative features. No abstractions for single-use code.
+3. **Surgical Changes** — Touch only what you must. Don't refactor what isn't broken. Match existing style.
+4. **Goal-Driven Execution** — Define success criteria. Loop until verified. Don't describe steps — describe what success looks like.
+
 Additional skills available as-needed: `programming-philosophy` (code quality principles), `dispatching-parallel-agents` (concurrent tasks), `context-mode` (large output processing).
 
 ---
