@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import type { Session } from "@/lib/session-store";
 import { ModelSelector } from "@/components/model-selector";
+import { SkeletonChatItem } from "@/components/skeleton";
 import { useAuth } from "@/lib/auth";
 
 interface SessionSidebarProps {
@@ -10,6 +11,7 @@ interface SessionSidebarProps {
   activeId: string | null;
   activeModel: string;
   systemPrompt?: string;
+  loading?: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
@@ -169,6 +171,7 @@ export function SessionSidebar({
   open,
   onClose,
   collapsed,
+  loading,
 }: SessionSidebarProps) {
   const { user } = useAuth();
   const grouped = groupSessions(sessions);
@@ -185,7 +188,7 @@ export function SessionSidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen z-50 w-72 bg-card border-r border-border flex flex-col transition-all duration-200 ${
+        className={`fixed top-0 left-0 h-dvh z-50 w-72 bg-card border-r border-border flex flex-col transition-all duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
         } ${
           collapsed ? "lg:hidden" : "lg:relative lg:h-full lg:translate-x-0"
@@ -239,7 +242,13 @@ export function SessionSidebar({
 
         {/* Session list */}
         <div className="flex-1 overflow-y-auto">
-          {sessions.length === 0 && (
+          {loading ? (
+            <div className="space-y-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonChatItem key={i} />
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
             <div className="text-center py-12 px-4">
               <div className="text-muted-foreground/40 mb-3">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto">
@@ -249,8 +258,7 @@ export function SessionSidebar({
               <p className="text-sm text-muted-foreground">No conversations yet</p>
               <p className="text-xs text-muted-foreground/60 mt-1">Send a message to start</p>
             </div>
-          )}
-          {grouped.map((group) => (
+          ) : grouped.map((group) => (
             <div key={group.label} className="mb-1">
               <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider">
                 {group.label}

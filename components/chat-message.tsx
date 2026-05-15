@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { SessionMessage } from "@/lib/session-store";
+import { ChatError } from "@/components/chat-error";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -62,6 +63,7 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, onEdit, index, streaming }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const isError = message.isError;
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.content);
 
@@ -190,8 +192,13 @@ export function ChatMessage({ message, onEdit, index, streaming }: ChatMessagePr
         </div>
       )}
 
-            {/* Main text response — markdown rendered */}
-      {message.content && (
+            {/* Error message — styled error card */}
+      {isError && message.content && (
+        <ChatError message={message.content} />
+      )}
+
+      {/* Main text response — markdown rendered */}
+      {message.content && !isError && (
         <div className="relative group/msg">
           <div className="rounded-lg p-3 bg-card border border-border">
             <div className={`prose prose-invert prose-sm max-w-none

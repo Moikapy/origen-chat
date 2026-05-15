@@ -15,6 +15,7 @@ export interface SessionMessage {
   citations?: Array<{ book: string; chapter: number; verse: number }>;
   usage?: { promptTokens?: number; completionTokens?: number; totalCost?: number };
   streaming?: boolean;
+  isError?: boolean;
 }
 
 export interface Session {

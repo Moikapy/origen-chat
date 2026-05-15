@@ -40,6 +40,7 @@ function ChatPageInner() {
     updateSystemPrompt,
     syncOnAuth,
   } = useSessions();
+  const sessionsLoading = loading;
 
   const [streaming, setStreaming] = useState(false);
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
@@ -288,11 +289,12 @@ function ChatPageInner() {
               case "error":
                 // Preserve any content that was already streamed before the error
                 const errorContent = currentContent
-                  ? `${currentContent}\n\n⚠️ Error: ${event.message}`
-                  : `Error: ${event.message}`;
+                  ? `${currentContent}\n\n${event.message}`
+                  : event.message;
                 await finalizeMessage({
                   content: errorContent,
                   streaming: false,
+                  isError: true,
                 }, sessionId);
                 break;
             }
@@ -306,8 +308,9 @@ function ChatPageInner() {
         // User cancelled
       } else {
         await finalizeMessage({
-          content: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
+          content: err instanceof Error ? err.message : "Unknown error",
           streaming: false,
+          isError: true,
         }, sessionId);
       }
     } finally {
@@ -419,9 +422,9 @@ function ChatPageInner() {
                 break;
               case "error":
                 const errorContent = currentContent
-                  ? `${currentContent}\n\n⚠️ Error: ${event.message}`
-                  : `Error: ${event.message}`;
-                await finalizeMessage({ content: errorContent, streaming: false }, activeId);
+                  ? `${currentContent}\n\n${event.message}`
+                  : event.message;
+                await finalizeMessage({ content: errorContent, streaming: false, isError: true }, activeId);
                 break;
             }
           } catch { /* skip */ }
@@ -430,8 +433,9 @@ function ChatPageInner() {
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
         await finalizeMessage({
-          content: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
+          content: err instanceof Error ? err.message : "Unknown error",
           streaming: false,
+          isError: true,
         }, activeId);
       }
     } finally {
@@ -444,13 +448,14 @@ function ChatPageInner() {
   const messages = activeSession?.messages ?? [];
 
   return (
-    <div className="h-screen bg-background text-foreground flex overflow-hidden">
+    <div className="h-dvh bg-background text-foreground flex overflow-hidden">
       {/* Sidebar */}
       <SessionSidebar
         sessions={sessions}
         activeId={activeId}
         activeModel={model}
         systemPrompt={activeSession?.systemPrompt}
+        loading={sessionsLoading}
         onSelect={switchTo}
         onDelete={remove}
         onRename={rename}
@@ -552,7 +557,7 @@ function ChatPageInner() {
             <span>Streaming... {streamElapsed}s</span>
           </div>
         )}
-        <footer className="border-t border-border px-4 py-3">
+        <footer className="border-t border-border px-4 py-3 safe-bottom">
           <div className="mx-auto max-w-3xl">
             <div
               className="flex gap-3 items-end border border-border rounded-lg bg-card p-3 focus-within:ring-2 focus-within:ring-ring"

@@ -160,3 +160,7 @@ code.hljs {
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-muted-foreground);
 }
+/* Safe area padding for iOS */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
