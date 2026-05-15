@@ -5,9 +5,7 @@ import { useModels } from "@/lib/use-models";
 
 export default function LandingPage() {
   const { models, loading } = useModels();
-
   const freeModels = models.filter((m) => m.free);
-  const premiumModels = models.filter((m) => !m.free);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -18,6 +16,9 @@ export default function LandingPage() {
             Origen
           </Link>
           <div className="flex items-center gap-4">
+            <Link href="/models" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Models
+            </Link>
             <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Sign in
             </Link>
@@ -36,7 +37,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-medium mb-8">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            {freeModels.length} free models — no account needed
+            {loading ? "Loading…" : `${freeModels.length} free models — no account needed`}
           </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
@@ -57,10 +58,10 @@ export default function LandingPage() {
               Try it free →
             </Link>
             <Link
-              href="/auth/login"
+              href="/models"
               className="px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors text-sm"
             >
-              Sign in
+              View models
             </Link>
           </div>
         </div>
@@ -69,50 +70,30 @@ export default function LandingPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       </section>
 
-      {/* Models grid — dynamic from OpenRouter API */}
-      <section className="border-t border-border/50">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold mb-3">Models</h2>
-            <p className="text-muted-foreground">Free models work without an account. Premium models need an API key.</p>
+      {/* Model preview — top free models only */}
+      {!loading && freeModels.length > 0 && (
+        <section className="border-t border-border/50">
+          <div className="mx-auto max-w-6xl px-6 py-16">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">Free models</h2>
+              <Link href="/models" className="text-sm text-primary hover:underline">
+                View all models →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {freeModels.slice(0, 8).map((m) => (
+                <div
+                  key={m.id}
+                  className="rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2.5 text-sm"
+                >
+                  <div className="font-medium">{m.name}</div>
+                  <div className="text-xs mt-0.5 opacity-75">✓ Free</div>
+                </div>
+              ))}
+            </div>
           </div>
-
-          {loading ? (
-            <div className="text-center text-muted-foreground py-8">Loading models…</div>
-          ) : (
-            <>
-              {freeModels.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-sm font-medium text-primary mb-3">Free</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {freeModels.map((m) => (
-                      <div key={m.id} className="rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2.5 text-left text-sm">
-                        <div className="font-medium">{m.name}</div>
-                        <div className="text-xs mt-0.5 opacity-75">✓ Free</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {premiumModels.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Premium</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {premiumModels.map((m) => (
-                      <div key={m.id} className="rounded-lg border border-border bg-card text-muted-foreground px-3 py-2.5 text-left text-sm">
-                        <div className="font-medium text-foreground">{m.name}</div>
-                        <div className="text-xs mt-0.5 opacity-75">
-                          {m.pricing ? `${m.pricing.prompt}/${m.pricing.completion}` : "Premium"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Features */}
       <section className="border-t border-border/50">
