@@ -1,6 +1,7 @@
 "use client";
 
 import { useModels } from "@/lib/use-models";
+import { getProviderBadge } from "@/lib/models";
 
 export function ModelSelector({
   value,
@@ -23,25 +24,31 @@ export function ModelSelector({
       className="text-sm bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1.5 w-full truncate"
     >
       {loading ? (
-        <option>Loading models…</option>
+        <option>Loading models...</option>
       ) : (
         <>
           {freeModels.length > 0 && (
             <optgroup label="Free">
-              {freeModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ✓
-                </option>
-              ))}
+              {freeModels.map((m) => {
+                const badge = getProviderBadge(m.id);
+                return (
+                  <option key={m.id} value={m.id}>
+                    [{badge.text}] {m.name}
+                  </option>
+                );
+              })}
             </optgroup>
           )}
           {!freeOnly && premiumModels.length > 0 && (
             <optgroup label="Premium">
-              {premiumModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} {m.pricing ? `· ${m.pricing.prompt}` : ""}
-                </option>
-              ))}
+              {premiumModels.map((m) => {
+                const badge = getProviderBadge(m.id);
+                return (
+                  <option key={m.id} value={m.id}>
+                    [{badge.text}] {m.name} {m.pricing ? `· ${m.pricing.prompt}` : ""}
+                  </option>
+                );
+              })}
             </optgroup>
           )}
         </>

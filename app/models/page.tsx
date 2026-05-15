@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useModels, type UIModel } from "@/lib/use-models";
+import { getProviderBadge } from "@/lib/models";
 import { SiteNav, SiteFooter } from "@/components/site-layout";
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -520,9 +521,14 @@ function ModelRow({ model }: { model: UIModel }) {
             Free
           </span>
         )}
-        <div className="min-w-0">
+      <div className="min-w-0">
           <div className="font-medium text-foreground truncate">{model.name}</div>
-          <div className="text-xs text-muted-foreground truncate">{model.provider}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            <span className={`inline-block px-1 py-0.5 rounded text-[10px] font-medium mr-1 ${getProviderBadge(model.id).color}`}>
+              {getProviderBadge(model.id).text}
+            </span>
+            {model.provider}
+          </div>
         </div>
       </div>
       <div className="text-right font-mono text-sm">

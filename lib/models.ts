@@ -92,3 +92,28 @@ export const MODEL_GROUPS = [
 ];
 
 export type ModelId = keyof typeof MODELS;
+
+/** Extract provider from a model ID and return a display badge */
+export function getProviderBadge(modelId: string): { text: string; color: string } {
+  const slug = modelId.startsWith("openrouter/") ? modelId.slice("openrouter/".length) : modelId;
+  const provider = slug.split("/")[0];
+
+  const badges: Record<string, { text: string; color: string }> = {
+    anthropic: { text: "ANT", color: "bg-orange-500/20 text-orange-400" },
+    openai: { text: "OAI", color: "bg-green-500/20 text-green-400" },
+    google: { text: "GOO", color: "bg-blue-500/20 text-blue-400" },
+    deepseek: { text: "DS", color: "bg-yellow-500/20 text-yellow-400" },
+    "meta-llama": { text: "ML", color: "bg-purple-500/20 text-purple-400" },
+    "x-ai": { text: "XAI", color: "bg-gray-500/20 text-gray-400" },
+    mistralai: { text: "MIS", color: "bg-cyan-500/20 text-cyan-400" },
+    nvidia: { text: "NV", color: "bg-lime-500/20 text-lime-400" },
+    inclusionai: { text: "INC", color: "bg-pink-500/20 text-pink-400" },
+  };
+
+  // Special case: free router
+  if (modelId === "openrouter/free" || slug === "free") {
+    return { text: "FREE", color: "bg-primary/20 text-primary" };
+  }
+
+  return badges[provider] ?? { text: provider.slice(0, 3).toUpperCase(), color: "bg-muted text-muted-foreground" };
+}

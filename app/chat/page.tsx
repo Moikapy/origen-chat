@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -20,7 +21,7 @@ type StreamEvent =
   | { type: "done"; message: string; citations: Array<{ book: string; chapter: number; verse: number }>; usage?: { promptTokens?: number; completionTokens?: number; totalCost?: number } }
   | { type: "error"; message: string };
 
-export default function ChatPage() {
+function ChatPageInner() {
   const { user, logout } = useAuth();
   const {
     sessions,
@@ -43,6 +44,13 @@ export default function ChatPage() {
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
   const [streamElapsed, setStreamElapsed] = useState(0);
   const [model, setModel] = useState<string>("openrouter/free");
+
+  // Read model from URL search params (deep link from models page)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const m = searchParams.get("model");
+    if (m) setModel(m);
+  }, [searchParams]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -603,4 +611,13 @@ function getAuthConfig(): Record<string, string> {
   } catch {
     return {};
   }
+}
+import { Suspense } from "react";
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
+  );
 }
