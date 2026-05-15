@@ -38,8 +38,8 @@ function ModelCard({ model }: { model: UIModel }) {
       {model.context_length && (
         <div className="mt-2 text-xs text-muted-foreground">
           {model.context_length >= 1_000_000
-            ? `${(model.context_length / 1_000_000).toFixed(1)}M tokens`
-            : `${(model.context_length / 1_000).toFixed(0)}K tokens`}{" "}
+            ? `${(model.context_length / 1_000_000).toFixed(1)}M`
+            : `${(model.context_length / 1_000).toFixed(0)}K`}{" "}
           context
         </div>
       )}
@@ -54,7 +54,6 @@ export default function ModelsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
       <nav className="border-b border-border/50">
         <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
@@ -81,8 +80,7 @@ export default function ModelsPage() {
         <div className="mb-12">
           <h1 className="text-3xl font-bold mb-3">Models</h1>
           <p className="text-muted-foreground text-lg">
-            All models available through Origen Chat. Free models require no account.
-            Premium models need an API key.
+            Free models require no account. Premium models need an API key.
           </p>
         </div>
 
@@ -93,13 +91,12 @@ export default function ModelsPage() {
           </div>
         ) : (
           <>
-            {/* Free models */}
             {freeModels.length > 0 && (
               <section className="mb-12">
                 <div className="flex items-center gap-3 mb-6">
                   <h2 className="text-xl font-semibold text-primary">Free</h2>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                    {freeModels.length} models — no account needed
+                    {freeModels.length} models
                   </span>
                 </div>
                 <div className="grid gap-3">
@@ -109,14 +106,12 @@ export default function ModelsPage() {
                 </div>
               </section>
             )}
-
-            {/* Premium models */}
             {premiumModels.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-6">
                   <h2 className="text-xl font-semibold">Premium</h2>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                    {premiumModels.length} models — API key required
+                    {premiumModels.length} models
                   </span>
                 </div>
                 <div className="grid gap-3">
@@ -129,21 +124,18 @@ export default function ModelsPage() {
           </>
         )}
 
-        {/* Pricing explainer */}
         <div className="mt-16 rounded-lg border border-border p-6 text-sm text-muted-foreground">
           <h3 className="font-semibold text-foreground mb-2">How pricing works</h3>
           <p>
-            Premium model prices shown are <strong className="text-foreground">input / output per 1M tokens</strong>,
-            sourced live from OpenRouter. You pay only for what you use — no subscriptions, no minimums.
-            Bring your own OpenRouter API key to access premium models.
+            Premium prices shown are <strong className="text-foreground">input / output per 1M tokens</strong>,
+            sourced live from OpenRouter. Pay only for what you use — no subscriptions, no minimums.
           </p>
           <p className="mt-2">
-            Free models are completely free with no API key required. Just start chatting.
+            Free models are completely free with no API key required.
           </p>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border/50 mt-16">
         <div className="mx-auto max-w-5xl px-6 py-6 flex items-center justify-between text-xs text-muted-foreground">
           <span>Built by <a href="https://moikapy.dev" className="hover:text-foreground transition-colors">Moikapy</a></span>

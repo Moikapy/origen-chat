@@ -3,9 +3,27 @@
 import Link from "next/link";
 import { useModels } from "@/lib/use-models";
 
+// Top-tier premium models to feature on landing page
+const FEATURED_PREMIUM = [
+  "anthropic/claude-opus-4.7",
+  "anthropic/claude-opus-4",
+  "anthropic/claude-sonnet-4",
+  "openai/gpt-4.1",
+  "openai/o4-mini",
+  "google/gemini-2.5-pro",
+  "x-ai/grok-4.3",
+  "meta-llama/llama-4-maverick",
+];
+
 export default function LandingPage() {
   const { models, loading } = useModels();
   const freeModels = models.filter((m) => m.free);
+
+  // Show featured premium models that exist in the live data
+  const premiumModels = models.filter((m) => {
+    if (m.free) return false;
+    return FEATURED_PREMIUM.some((p) => m.id.endsWith("/" + p) || m.id === "openrouter/" + p);
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -61,24 +79,26 @@ export default function LandingPage() {
               href="/models"
               className="px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors text-sm"
             >
-              View models
+              View all models
             </Link>
           </div>
         </div>
 
-        {/* Subtle gradient orb */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       </section>
 
-      {/* Model preview — top free models only */}
+      {/* Free models preview */}
       {!loading && freeModels.length > 0 && (
         <section className="border-t border-border/50">
           <div className="mx-auto max-w-6xl px-6 py-16">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold">Free models</h2>
-              <Link href="/models" className="text-sm text-primary hover:underline">
-                View all models →
-              </Link>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Free models</h2>
+                <p className="text-muted-foreground text-sm mt-1">No account needed. No API key required.</p>
+              </div>
+              <span className="text-xs text-primary bg-primary/10 px-3 py-1 rounded-full font-medium">
+                {freeModels.length} available
+              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {freeModels.slice(0, 8).map((m) => (
@@ -88,6 +108,56 @@ export default function LandingPage() {
                 >
                   <div className="font-medium">{m.name}</div>
                   <div className="text-xs mt-0.5 opacity-75">✓ Free</div>
+                </div>
+              ))}
+            </div>
+            {freeModels.length > 8 && (
+              <div className="mt-4 text-center">
+                <Link href="/models" className="text-sm text-primary hover:underline">
+                  + {freeModels.length - 8} more free models →
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Premium models preview */}
+      {!loading && premiumModels.length > 0 && (
+        <section className="border-t border-border/50">
+          <div className="mx-auto max-w-6xl px-6 py-16">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Top premium models</h2>
+                <p className="text-muted-foreground text-sm mt-1">Bring your own API key. Pay only for what you use.</p>
+              </div>
+              <Link
+                href="/models"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {premiumModels.slice(0, 8).map((m) => (
+                <div
+                  key={m.id}
+                  className="rounded-lg border border-border bg-card px-4 py-3 flex items-center justify-between"
+                >
+                  <div>
+                    <div className="font-medium text-foreground">{m.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {m.context_length >= 1_000_000
+                        ? `${(m.context_length / 1_000_000).toFixed(0)}M context`
+                        : `${(m.context_length / 1_000).toFixed(0)}K context`}
+                    </div>
+                  </div>
+                  {m.pricing && (
+                    <div className="text-right text-sm font-mono">
+                      <div className="text-foreground">{m.pricing.prompt}</div>
+                      <div className="text-muted-foreground text-xs">{m.pricing.completion}</div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -134,16 +204,23 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-20 text-center">
           <h2 className="text-3xl font-bold mb-4">Start chatting now</h2>
           <p className="text-muted-foreground mb-8">No account needed for free models.</p>
-          <Link
-            href="/chat"
-            className="inline-block px-8 py-3 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
-          >
-            Open chat →
-          </Link>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link
+              href="/chat"
+              className="px-8 py-3 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+            >
+              Open chat →
+            </Link>
+            <Link
+              href="/models"
+              className="px-8 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors"
+            >
+              Browse models
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-border/50">
         <div className="mx-auto max-w-6xl px-6 py-6 flex items-center justify-between text-xs text-muted-foreground">
           <span>Built by <a href="https://moikapy.dev" className="hover:text-foreground transition-colors">Moikapy</a></span>
