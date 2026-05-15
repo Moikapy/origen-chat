@@ -16,7 +16,7 @@
     "@0xkobold/warm-editorial": "file:../warm-editorial",
     "@moikapy/magic-link": "^0.1.2",
     "@moikapy/openrouter-auth": "^0.1.0",
-    "@moikapy/origen": "^0.5.3",
+    "@moikapy/origen": "^0.5.4",
     "@tailwindcss/postcss": "^4.3.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-placeholder": "^2.6.0",
