@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { Session } from "@/lib/session-store";
 import { ModelSelector } from "@/components/model-selector";
 import { useAuth } from "@/lib/auth";
@@ -9,11 +9,13 @@ interface SessionSidebarProps {
   sessions: Session[];
   activeId: string | null;
   activeModel: string;
+  systemPrompt?: string;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onNew: () => void;
   onModelChange: (model: string) => void;
+  onSystemPromptChange: (prompt: string) => void;
   open: boolean;
   onClose: () => void;
   collapsed: boolean;
@@ -70,6 +72,18 @@ function SessionItem({
 }) {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDelete = () => {
+    if (confirmDelete) {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+      onDelete();
+    } else {
+      setConfirmDelete(true);
+      confirmTimer.current = setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  };
 
   if (editing) {
     return (
@@ -122,14 +136,20 @@ function SessionItem({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onDelete();
+          handleDelete();
         }}
-        className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-all p-0.5 rounded"
-        title="Delete"
+        className={`flex-shrink-0 ${confirmDelete ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${confirmDelete ? "text-destructive" : "text-muted-foreground/40 hover:text-destructive"} transition-all p-0.5 rounded`}
+        title={confirmDelete ? "Click again to delete" : "Delete"}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-        </svg>
+        {confirmDelete ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        )}
       </button>
     </div>
   );
@@ -144,6 +164,8 @@ export function SessionSidebar({
   onRename,
   onNew,
   onModelChange,
+  systemPrompt,
+  onSystemPromptChange,
   open,
   onClose,
   collapsed,
@@ -199,6 +221,20 @@ export function SessionSidebar({
               <a href="/auth/login" className="text-primary hover:underline">Sign in</a> to use premium models
             </p>
           )}
+
+          {/* System prompt */}
+          <details className="mt-2">
+            <summary className="text-[11px] text-muted-foreground/70 cursor-pointer hover:text-foreground transition-colors select-none">
+              System prompt
+            </summary>
+            <textarea
+              value={systemPrompt || ""}
+              onChange={(e) => onSystemPromptChange(e.target.value)}
+              placeholder="Custom instructions for the AI..."
+              className="mt-1 w-full bg-input/50 border border-border rounded p-2 text-xs text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              rows={3}
+            />
+          </details>
         </div>
 
         {/* Session list */}

@@ -57,9 +57,10 @@ interface ChatMessageProps {
   message: SessionMessage;
   onEdit?: (index: number, newContent: string) => void;
   index: number;
+  streaming?: boolean;
 }
 
-export function ChatMessage({ message, onEdit, index }: ChatMessageProps) {
+export function ChatMessage({ message, onEdit, index, streaming }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.content);
@@ -189,11 +190,11 @@ export function ChatMessage({ message, onEdit, index }: ChatMessageProps) {
         </div>
       )}
 
-      {/* Main text response — markdown rendered */}
+            {/* Main text response — markdown rendered */}
       {message.content && (
         <div className="relative group/msg">
           <div className="rounded-lg p-3 bg-card border border-border">
-            <div className="prose prose-invert prose-sm max-w-none
+            <div className={`prose prose-invert prose-sm max-w-none
               prose-p:my-2 prose-p:leading-relaxed
               prose-headings:text-foreground prose-headings:font-semibold
               prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-2
@@ -209,7 +210,7 @@ export function ChatMessage({ message, onEdit, index }: ChatMessageProps) {
               prose-td:border prose-td:border-border prose-td:px-2 prose-td:py-1
               prose-blockquote:border-l-primary/50 prose-blockquote:text-muted-foreground
               prose-hr:border-border
-            ">
+            `}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
@@ -221,6 +222,9 @@ export function ChatMessage({ message, onEdit, index }: ChatMessageProps) {
               >
                 {message.content}
               </ReactMarkdown>
+              {streaming && (
+                <span className="streaming-cursor inline-block ml-0.5 text-primary" />
+              )}
             </div>
           </div>
           <div className="absolute -bottom-5 left-0">

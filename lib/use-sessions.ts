@@ -190,6 +190,19 @@ export function useSessions() {
     [activeId, activeSession, refreshList],
   );
 
+  // Update system prompt for a session
+  const updateSystemPrompt = useCallback(
+    async (id: string, systemPrompt: string) => {
+      const session = await getSession(id);
+      if (!session) return;
+      const updated = { ...session, systemPrompt: systemPrompt || undefined, updatedAt: Date.now() };
+      await saveSession(updated);
+      if (activeId === id) setActiveSession(updated);
+      await refreshList();
+    },
+    [activeId, refreshList],
+  );
+
   return {
     sessions,
     activeId,
@@ -204,5 +217,6 @@ export function useSessions() {
     finalizeMessage,
     clearActive,
     editAndResend,
+    updateSystemPrompt,
   };
 }

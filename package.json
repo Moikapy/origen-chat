@@ -10,13 +10,15 @@
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy",
-    "postinstall": "node scripts/postinstall.cjs"
+    "postinstall": "node scripts/postinstall.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@0xkobold/warm-editorial": "file:../warm-editorial",
     "@moikapy/magic-link": "^0.1.2",
     "@moikapy/openrouter-auth": "^0.1.0",
-    "@moikapy/origen": "^0.5.4",
+    "@moikapy/origen": "0.5.5",
     "@tailwindcss/postcss": "^4.3.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-placeholder": "^2.6.0",
@@ -34,12 +36,17 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260514.1",
     "@opennextjs/cloudflare": "^1.19.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "autoprefixer": "^10.5.0",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.8.0",
+    "vitest": "^4.1.6",
     "wrangler": "^4.14.0"
   }
 }

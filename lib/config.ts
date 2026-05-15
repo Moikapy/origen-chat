@@ -24,7 +24,6 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
   const supportsTools = modelSupportsTools(config.model);
   const isFree = isFreeModelId(config.model);
   const tools = createTools(supportsTools);
-  const isOllama = config.provider === "ollama";
 
   // Free models: max 1 tool call (2 steps = initial + tool response).
   // More than that burns through the 20 req/min free tier instantly.
@@ -46,12 +45,8 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
     // to avoid rate limiting. Premium users get the full wiki experience.
     wiki: config.wiki && supportsTools && !isFree ? { type: "cloud" as const } : undefined,
     maxSteps,
-    // OpenRouter plugins: response-healing auto-retries on malformed responses
-    onPayload: !isOllama ? (params: Record<string, unknown>) => {
-      // OpenRouter response-healing plugin fixes truncated/malformed responses
-      // Only applies to OpenRouter calls (not Ollama)
-      (params as any).plugins = [{ id: "response-healing" }];
-      return params;
-    } : undefined,
+    // Note: response-healing plugin is now injected by default in @moikapy/origen
+    // for all OpenRouter models. No need to specify onPayload here unless
+    // you want additional payload modifications.
   };
 }

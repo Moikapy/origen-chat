@@ -21,6 +21,7 @@ export interface Session {
   id: string;
   title: string;
   model: string;
+  systemPrompt?: string;
   messages: SessionMessage[];
   createdAt: number;
   updatedAt: number;

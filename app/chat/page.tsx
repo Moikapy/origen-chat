@@ -36,9 +36,12 @@ export default function ChatPage() {
     finalizeMessage,
     clearActive,
     editAndResend,
+    updateSystemPrompt,
   } = useSessions();
 
   const [streaming, setStreaming] = useState(false);
+  const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
+  const [streamElapsed, setStreamElapsed] = useState(0);
   const [model, setModel] = useState<string>("openrouter/free");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -74,6 +77,33 @@ export default function ChatPage() {
   });
 
   // Auto-scroll to bottom on new messages
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll: smooth for new messages, instant during streaming
+  // Only scroll if user is near bottom (within 150px)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    if (!nearBottom && messages.length > 0) return; // user scrolled up, don't force
+    messagesEndRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth" });
+  }, [activeSession?.messages, streaming]);
+
+  // Streaming timer
+  useEffect(() => {
+    if (!streaming) {
+      setStreamStartTime(null);
+      setStreamElapsed(0);
+      return;
+    }
+    setStreamStartTime(Date.now());
+    const interval = setInterval(() => {
+      setStreamElapsed(Math.round((Date.now() - (streamStartTime || Date.now())) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [streaming]);
+
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeSession?.messages]);
@@ -90,6 +120,31 @@ export default function ChatPage() {
     const session = await createNew(model);
     // sidebar stays as-is, just switches to new session
   }, [createNew, model, streaming]);
+
+  // Keyboard shortcuts
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Shift + N = New chat
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
+      // Escape = close/collapse sidebar
+      if (e.key === "Escape") {
+        if (sidebarOpen) setSidebarOpen(false);
+        else setSidebarCollapsed(!sidebarCollapsed);
+      }
+      // Ctrl/Cmd + / = Show shortcuts
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setShowShortcuts(true);
+        setTimeout(() => setShowShortcuts(false), 2000);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleNewChat, sidebarOpen, sidebarCollapsed]);
 
   const sendMessage = useCallback(async () => {
     if (!editor || streaming) return;
@@ -139,6 +194,7 @@ export default function ChatPage() {
           })),
           model,
           wiki: true,
+          systemPrompt: activeSession?.systemPrompt || undefined,
           ...auth,
         }),
         signal: abort.signal,
@@ -279,6 +335,7 @@ export default function ChatPage() {
           })),
           model,
           wiki: true,
+          systemPrompt: activeSession?.systemPrompt || undefined,
           ...auth,
         }),
         signal: abort.signal,
@@ -378,11 +435,15 @@ export default function ChatPage() {
         sessions={sessions}
         activeId={activeId}
         activeModel={model}
+        systemPrompt={activeSession?.systemPrompt}
         onSelect={switchTo}
         onDelete={remove}
         onRename={rename}
         onNew={handleNewChat}
         onModelChange={setModel}
+        onSystemPromptChange={(prompt) => {
+          if (activeId) updateSystemPrompt(activeId, prompt);
+        }}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         collapsed={sidebarCollapsed}
@@ -433,7 +494,7 @@ export default function ChatPage() {
         </header>
 
         {/* Messages */}
-        <main className="flex-1 overflow-y-auto px-4 py-6">
+        <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto max-w-3xl space-y-6 pb-4">
             {messages.length === 0 && !activeId && (
               <div className="text-center text-muted-foreground py-16">
@@ -457,7 +518,7 @@ export default function ChatPage() {
               </div>
             )}
             {messages.map((msg, idx) => (
-              <ChatMessage key={msg.id} message={msg} index={idx} onEdit={handleEditAndResend} />
+              <ChatMessage key={msg.id} message={msg} index={idx} onEdit={handleEditAndResend} streaming={streaming && idx === messages.length - 1 && msg.role === "assistant"} />
             ))}
             {streaming && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -470,6 +531,12 @@ export default function ChatPage() {
         </main>
 
         {/* Input */}
+        {streaming && (
+          <div className="px-4 py-1 border-t border-border/50 text-[11px] text-muted-foreground flex items-center gap-2">
+            <span className="animate-pulse text-primary">●</span>
+            <span>Streaming... {streamElapsed}s</span>
+          </div>
+        )}
         <footer className="border-t border-border px-4 py-3">
           <div className="mx-auto max-w-3xl">
             <div
@@ -506,6 +573,20 @@ export default function ChatPage() {
           </div>
         </footer>
       </div>
+
+      {/* Keyboard shortcuts overlay */}
+      {showShortcuts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-card border border-border rounded-lg p-4 shadow-xl text-sm">
+            <div className="text-foreground font-semibold mb-2">Keyboard Shortcuts</div>
+            <div className="space-y-1 text-muted-foreground">
+              <div><kbd className="text-xs px-1.5 py-0.5 rounded bg-muted border border-border">Ctrl+Shift+N</kbd> New chat</div>
+              <div><kbd className="text-xs px-1.5 py-0.5 rounded bg-muted border border-border">Esc</kbd> Toggle sidebar</div>
+              <div><kbd className="text-xs px-1.5 py-0.5 rounded bg-muted border border-border">Ctrl+/</kbd> Show shortcuts</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
