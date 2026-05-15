@@ -215,13 +215,6 @@ export async function checkRateLimit(
 
 /** Create the rate_limits table if it doesn't exist */
 export async function ensureRateLimitTable(d1: any): Promise<void> {
-  await d1.exec(
-    `CREATE TABLE IF NOT EXISTS rate_limits (
-      ip TEXT NOT NULL,
-      window_start INTEGER NOT NULL
-    )`
-  );
-  await d1.exec(
-    `CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)`
-  );
+  await d1.exec("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, window_start INTEGER NOT NULL)");
+  await d1.exec("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)");
 }
