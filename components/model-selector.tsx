@@ -1,14 +1,13 @@
 "use client";
 
 import { useModels } from "@/lib/use-models";
-import type { ModelId } from "@/lib/models";
 
 export function ModelSelector({
   value,
   onChange,
 }: {
   value: string;
-  onChange: (model: ModelId | string) => void;
+  onChange: (model: string) => void;
 }) {
   const { models, loading } = useModels();
 
@@ -19,7 +18,7 @@ export function ModelSelector({
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value as ModelId)}
+      onChange={(e) => onChange(e.target.value)}
       className="text-sm bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1.5 max-w-[220px] truncate"
     >
       {loading ? (

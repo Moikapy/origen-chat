@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useModels } from "@/lib/use-models";
+import { SiteNav, SiteFooter } from "@/components/site-layout";
 
 // Top-tier premium models to feature on landing page
 const FEATURED_PREMIUM = [
@@ -27,28 +28,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
-      <nav className="border-b border-border/50">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
-            Origen
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/models" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Models
-            </Link>
-            <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Sign in
-            </Link>
-            <Link
-              href="/chat"
-              className="text-sm px-4 py-2 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
-            >
-              Start free
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SiteNav variant="landing" />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -147,9 +127,9 @@ export default function LandingPage() {
                   <div>
                     <div className="font-medium text-foreground">{m.name}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {m.context_length >= 1_000_000
-                        ? `${(m.context_length / 1_000_000).toFixed(0)}M context`
-                        : `${(m.context_length / 1_000).toFixed(0)}K context`}
+                      {m.contextLength >= 1_000_000
+                        ? `${(m.contextLength / 1_000_000).toFixed(0)}M context`
+                        : `${(m.contextLength / 1_000).toFixed(0)}K context`}
                     </div>
                   </div>
                   {m.pricing && (
@@ -221,12 +201,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-border/50">
-        <div className="mx-auto max-w-6xl px-6 py-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Built by <a href="https://moikapy.dev" className="hover:text-foreground transition-colors">Moikapy</a></span>
-          <a href="https://moikapy.dev" className="hover:text-foreground transition-colors">moikapy.dev</a>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
