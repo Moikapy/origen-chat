@@ -136,7 +136,7 @@ async function fetchModels(): Promise<UIModel[]> {
             extraPricing.cacheWrite = parseFloat(m.pricing.input_cache_write) * 1_000_000;
 
           return {
-            id: m.id.includes("/") ? `openrouter/${m.id}` : m.id,
+            id: m.id.startsWith("openrouter/") ? m.id : `openrouter/${m.id}`,
             slug: rawSlug,
             name: cleanName,
             description: (m.description ?? "").split(".")[0].substring(0, 60),
