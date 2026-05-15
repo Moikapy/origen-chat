@@ -229,7 +229,7 @@ export default function ChatPage() {
   const messages = activeSession?.messages ?? [];
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="h-screen bg-background text-foreground flex overflow-hidden">
       {/* Sidebar */}
       <SessionSidebar
         sessions={sessions}

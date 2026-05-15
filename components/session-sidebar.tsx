@@ -161,7 +161,7 @@ export function SessionSidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:relative top-0 left-0 h-full z-50 w-72 bg-card border-r border-border flex flex-col transition-transform duration-200 ${
+        className={`fixed lg:relative top-0 left-0 h-screen lg:h-full z-50 w-72 bg-card border-r border-border flex flex-col transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >

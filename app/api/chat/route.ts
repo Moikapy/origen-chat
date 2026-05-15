@@ -90,7 +90,10 @@ export async function POST(request: Request): Promise<Response> {
   const config = buildAgentConfig(
     { model: apiModel, wiki, provider, apiKey, ollamaBaseUrl } as ChatConfig,
     async () => {
-      throw new Error("D1 not configured");
+      // D1 binding from Cloudflare Workers env
+      const d1 = (env as Record<string, unknown>).DB as any;
+      if (!d1) throw new Error("D1 database not available");
+      return d1 as any;
     },
   );
 
