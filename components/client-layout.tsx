@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from "@0xkobold/warm-editorial";
 import { useEffect } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -12,5 +13,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  return <ThemeProvider defaultTheme="dark">{children}</ThemeProvider>;
+  return (
+    <ErrorBoundary>
+      <ThemeProvider defaultTheme="dark">{children}</ThemeProvider>
+    </ErrorBoundary>
+  );
 }

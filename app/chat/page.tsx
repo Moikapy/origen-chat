@@ -772,11 +772,14 @@ function getAuthConfig(): Record<string, string> {
   }
 }
 import { Suspense } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 export default function ChatPage() {
   return (
-    <Suspense>
-      <ChatPageInner />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense>
+        <ChatPageInner />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
