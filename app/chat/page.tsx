@@ -94,10 +94,17 @@ export default function ChatPage() {
       });
 
       if (!res.ok) {
-        const err = await res.text();
+        let errMsg = `Request failed (${res.status})`;
+        try {
+          const errBody = (await res.json()) as { error?: string };
+          errMsg = errBody.error || errMsg;
+        } catch {
+          // fallback to raw text
+          errMsg = await res.text();
+        }
         setMessages((prev) => {
           const u = [...prev];
-          u[u.length - 1] = { ...u[u.length - 1], content: `Error: ${err}`, streaming: false };
+          u[u.length - 1] = { ...u[u.length - 1], content: errMsg, streaming: false };
           return u;
         });
         return;
