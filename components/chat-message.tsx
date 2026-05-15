@@ -2,18 +2,9 @@
 
 import ReactMarkdown from "react-markdown";
 import { Badge, Separator } from "@0xkobold/warm-editorial";
+import type { SessionMessage } from "@/lib/session-store";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  reasoning?: string;
-  toolCalls?: Array<{ name: string; args: Record<string, unknown>; result?: string }>;
-  citations?: Array<{ book: string; chapter: number; verse: number }>;
-  usage?: { promptTokens?: number; completionTokens?: number; totalCost?: number };
-}
-
-export function ChatMessage({ message }: { message: Message }) {
+export function ChatMessage({ message }: { message: SessionMessage }) {
   const isUser = message.role === "user";
 
   return (

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "ctx_batch_execute",
+      "ctx_fetch_and_index",
+      "write(*.ts)",
+      "edit(*.ts)"
+    ],
+    "deny": [],
+    "ask": [],
+    "denyPaths": [],
+    "additionalDirectories": []
+  }
+}
