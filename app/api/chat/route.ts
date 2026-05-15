@@ -147,15 +147,19 @@ export async function POST(request: Request): Promise<Response> {
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         
-        // Detect rate limit errors and provide helpful message
-        const is429 = errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('Rate limit');
-        const rateLimitMessage = is429
-          ? 'Rate limit hit. Free models have ~20 requests/min. Sign in with OpenRouter for higher limits, or wait a moment and try again.'
+        // Detect rate limit errors (both direct 429s and stream-read errors caused by rate limiting)
+        const is429 = errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('Rate limit') || errorMsg.includes('free-models-per-min');
+        const isStreamError = errorMsg.includes('body stream already read') || errorMsg.includes('Failed to fetch');
+        
+        const userMessage = is429
+          ? 'Rate limit reached. Free models allow ~20 requests/min. Sign in with OpenRouter for higher limits, or wait 60 seconds.'
+          : isStreamError
+          ? 'Connection interrupted — this usually means a rate limit was hit. Wait a moment and try again, or sign in for higher limits.'
           : `Error: ${errorMsg}`;
         
         const errorEvent: StreamEvent = {
           type: "error",
-          message: rateLimitMessage,
+          message: userMessage,
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
       } finally {

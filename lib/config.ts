@@ -25,12 +25,11 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
   const isFree = isFreeModelId(config.model);
   const tools = createTools(supportsTools);
 
-  // Free models get fewer steps to avoid rate limits.
-  // Each step = 1 API call. Free tier allows ~20 req/min.
-  // With tools: 3 steps = user-msg + tool-call + response = 3 calls.
-  // Without tools: 1 step = 1 call.
-  // Premium models: up to 10 steps.
-  const maxSteps = !supportsTools ? 1 : isFree ? 3 : 10;
+  // Free models: max 1 tool call (2 steps = initial + tool response).
+  // More than that burns through the 20 req/min free tier instantly.
+  // Premium: up to 5 tool calls (10 steps).
+  // No tool support: 1 step (single LLM call).
+  const maxSteps = !supportsTools ? 1 : isFree ? 2 : 10;
 
   return {
     appName: "Origen Chat",
