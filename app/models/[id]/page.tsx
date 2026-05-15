@@ -184,6 +184,12 @@ function ModelDetail({ model }: { model: UIModel }) {
           >
             Chat with {model.name}
           </Link>
+          <Link
+            href={`/models/compare?models=${encodeURIComponent(model.slug)}`}
+            className="px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors"
+          >
+            Compare
+          </Link>
           <a
             href={`https://openrouter.ai/${model.slug}`}
             target="_blank"
