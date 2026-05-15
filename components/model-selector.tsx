@@ -5,13 +5,14 @@ import { useModels } from "@/lib/use-models";
 export function ModelSelector({
   value,
   onChange,
+  freeOnly = false,
 }: {
   value: string;
   onChange: (model: string) => void;
+  freeOnly?: boolean;
 }) {
   const { models, loading } = useModels();
 
-  // Fall back to static list if API hasn't loaded yet
   const freeModels = models.filter((m) => m.free);
   const premiumModels = models.filter((m) => !m.free);
 
@@ -19,7 +20,7 @@ export function ModelSelector({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="text-sm bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1.5 max-w-[220px] truncate"
+      className="text-sm bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1.5 w-full truncate"
     >
       {loading ? (
         <option>Loading models…</option>
@@ -34,7 +35,7 @@ export function ModelSelector({
               ))}
             </optgroup>
           )}
-          {premiumModels.length > 0 && (
+          {!freeOnly && premiumModels.length > 0 && (
             <optgroup label="Premium">
               {premiumModels.map((m) => (
                 <option key={m.id} value={m.id}>

@@ -6,7 +6,6 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { ChatMessage } from "@/components/chat-message";
-import { ModelSelector } from "@/components/model-selector";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { useSessions } from "@/lib/use-sessions";
 import type { SessionMessage } from "@/lib/session-store";
@@ -50,6 +49,13 @@ export default function ChatPage() {
       setModel(activeSession.model);
     }
   }, [activeSession?.model]);
+
+  // Force free models for logged-out users
+  useEffect(() => {
+    if (!user && model !== "openrouter/free" && !model.endsWith(":free")) {
+      setModel("openrouter/free");
+    }
+  }, [user]);
 
   const editor = useEditor({
     extensions: [
@@ -226,10 +232,12 @@ export default function ChatPage() {
       <SessionSidebar
         sessions={sessions}
         activeId={activeId}
+        activeModel={model}
         onSelect={switchTo}
         onDelete={remove}
         onRename={rename}
         onNew={handleNewChat}
+        onModelChange={setModel}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -254,7 +262,6 @@ export default function ChatPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <ModelSelector value={model} onChange={setModel} />
               {user ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>

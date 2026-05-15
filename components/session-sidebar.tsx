@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Session } from "@/lib/session-store";
+import { ModelSelector } from "@/components/model-selector";
+import { useAuth } from "@/lib/auth";
 
 interface SessionSidebarProps {
   sessions: Session[];
   activeId: string | null;
-  onSelect: (id: string) => void;
+  activeModel: string;
+  onSelect: (id: string) => void,
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onNew: () => void;
+  onModelChange: (model: string) => void;
   open: boolean;
   onClose: () => void;
 }
@@ -101,13 +105,16 @@ function SessionItem({
 export function SessionSidebar({
   sessions,
   activeId,
+  activeModel,
   onSelect,
   onDelete,
   onRename,
   onNew,
+  onModelChange,
   open,
   onClose,
 }: SessionSidebarProps) {
+  const { user } = useAuth();
   return (
     <>
       {/* Mobile overlay */}
@@ -143,6 +150,16 @@ export function SessionSidebar({
               </svg>
             </button>
           </div>
+        </div>
+
+        {/* Model selector */}
+        <div className="px-2 py-2 border-b border-border">
+          <ModelSelector value={activeModel} onChange={onModelChange} freeOnly={!user} />
+          {!user && (
+            <p className="text-xs text-muted-foreground mt-1 px-1">
+              <a href="/auth/login" className="text-primary hover:underline">Sign in</a> to use premium models
+            </p>
+          )}
         </div>
 
         {/* Session list */}
