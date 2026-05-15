@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@0xkobold/warm-editorial": "file:../warm-editorial",
+    "@moikapy/cf-helpers": "file:../cf-helpers",
     "@moikapy/magic-link": "^0.1.2",
     "@moikapy/openrouter-auth": "^0.1.0",
     "@moikapy/origen": "0.5.5",

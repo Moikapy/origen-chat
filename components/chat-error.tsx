@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { classifyError, type ErrorKind } from "@/lib/error-classifier";
+import { classifyError, type ErrorKind } from "@moikapy/cf-helpers/error";
 
-export { classifyError, type ErrorKind } from "@/lib/error-classifier";
+export type { ErrorKind } from "@moikapy/cf-helpers/error";
 
 const STYLES: Record<ErrorKind, { border: string; bg: string; icon: string; title: string }> = {
   rate_limit: {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyError } from "@/lib/error-classifier";
+import { classifyError } from "@moikapy/cf-helpers/error";
 
 describe("classifyError", () => {
   it("classifies rate limit errors", () => {

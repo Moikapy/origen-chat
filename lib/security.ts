@@ -1,4 +1,12 @@
 import { MODELS } from "./models";
+import {
+  RateLimiter,
+  ensureTable,
+  ensureIndex,
+  validateUrl as cfValidateUrl,
+  type SSRFResult,
+  type RateLimitResult as CfRateLimitResult,
+} from "@moikapy/cf-helpers";
 
 // ── Constants ──────────────────────────────────────────────────────────
 export const MAX_MESSAGES = 100;
@@ -63,7 +71,7 @@ export function validateChatRequest(input: ChatRequestInput): ValidationResult {
     return { ok: false, error: `Invalid model: ${model}` };
   }
 
-  // Validate ollamaBaseUrl if present
+  // Validate ollamaBaseUrl if present — delegate to cf-helpers SSRF guard
   if (ollamaBaseUrl) {
     const urlResult = sanitizeOllamaUrl(ollamaBaseUrl);
     if (!urlResult.ok) {
@@ -84,83 +92,28 @@ export function validateChatRequest(input: ChatRequestInput): ValidationResult {
   return { ok: true };
 }
 
-// ── SSRF Protection ────────────────────────────────────────────────────
+// ── SSRF Protection (delegates to @moikapy/cf-helpers/ssrf) ──────────────
+
+/** Re-export SSRF validation from cf-helpers */
+export { validateUrl } from "@moikapy/cf-helpers/ssrf";
 
 /** Check if an IPv4 address is private/reserved */
 export function isPrivateIP(ip: string): boolean {
-  const parts = ip.split(".").map(Number);
-  if (parts.length !== 4 || parts.some(isNaN)) return true; // treat malformed as private
-
-  const [a, b] = parts;
-
-  // 0.0.0.0/8
-  if (a === 0) return true;
-  // 10.0.0.0/8
-  if (a === 10) return true;
-  // 127.0.0.0/8 (loopback)
-  if (a === 127) return true;
-  // 169.254.0.0/16 (link-local / AWS metadata)
-  if (a === 169 && b === 254) return true;
-  // 172.16.0.0/12
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  // 192.168.0.0/16
-  if (a === 192 && b === 168) return true;
-  // 224.0.0.0/4 (multicast + reserved)
-  if (a >= 224) return true;
-
-  return false;
-}
-
-interface OllamaUrlResult {
-  ok: boolean;
-  error?: string;
-  url?: string;
+  // Must look like an IPv4 address first
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return true;
+  const result = cfValidateUrl(`http://${ip}/`);
+  return !result.ok;
 }
 
 /** Validate and sanitize an Ollama base URL */
 export function sanitizeOllamaUrl(
   rawUrl: string,
   options: { allowLocalhost?: boolean } = {},
-): OllamaUrlResult {
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    return { ok: false, error: "Invalid URL format" };
-  }
-
-  // Only allow http: and https: protocols
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    return { ok: false, error: "Only HTTPS and HTTP protocols are allowed" };
-  }
-
-  const hostname = url.hostname;
-
-  // Block localhost unless explicitly allowed (for development)
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
-    if (!options.allowLocalhost) {
-      return { ok: false, error: "Private/local addresses are not allowed" };
-    }
-  }
-
-  // Block private IPs
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
-    if (isPrivateIP(hostname)) {
-      return { ok: false, error: "Private IP addresses are not allowed" };
-    }
-  }
-
-  // Block .local, .internal, .localhost TLDs
-  if (hostname.endsWith(".local") || hostname.endsWith(".internal") || hostname.endsWith(".localhost")) {
-    return { ok: false, error: "Private hostnames are not allowed" };
-  }
-
-  // Remove trailing slash for consistency
-  const sanitized = url.toString().replace(/\/+$/, "");
-  return { ok: true, url: sanitized };
+): SSRFResult {
+  return cfValidateUrl(rawUrl, options);
 }
 
-// ── Rate Limiting ───────────────────────────────────────────────────────
+// ── Rate Limiting (delegates to @moikapy/cf-helpers/rate-limit) ────────
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -168,10 +121,23 @@ export interface RateLimitResult {
   resetAt: number; // unix ms
 }
 
+// Singleton rate limiter per D1 instance
+const limiters = new WeakMap<object, RateLimiter>();
+
+function getLimiter(d1: any): RateLimiter {
+  if (!limiters.has(d1)) {
+    limiters.set(d1, new RateLimiter(d1, {
+      anonymousLimit: RATE_LIMIT_MAX_REQUESTS,
+      authenticatedLimit: RATE_LIMIT_MAX_REQUESTS_AUTHED,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+    }));
+  }
+  return limiters.get(d1)!;
+}
+
 /**
  * Per-user/IP rate limiter using D1.
- * Authenticated users: rate limited by user_id (higher limit).
- * Anonymous users: rate limited by IP (lower limit).
+ * Delegates to @moikapy/cf-helpers RateLimiter class.
  */
 export async function checkRateLimit(
   d1: any,
@@ -179,58 +145,14 @@ export async function checkRateLimit(
   authenticated: boolean,
   userId?: string | null,
 ): Promise<RateLimitResult> {
-  const now = Date.now();
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
-  const maxRequests = authenticated ? RATE_LIMIT_MAX_REQUESTS_AUTHED : RATE_LIMIT_MAX_REQUESTS;
-
-  // Clean up old entries
-  await d1.prepare(
-    "DELETE FROM rate_limits WHERE window_start < ?1"
-  ).bind(windowStart).run();
-
-  // Count: prefer user_id for authenticated users, else fall back to IP
-  const count = userId
-    ? await d1.prepare(
-        "SELECT COUNT(*) as cnt FROM rate_limits WHERE user_id = ?1 AND window_start > ?2"
-      ).bind(userId, windowStart).first()
-    : await d1.prepare(
-        "SELECT COUNT(*) as cnt FROM rate_limits WHERE ip = ?1 AND window_start > ?2"
-      ).bind(ip, windowStart).first();
-
-  const currentCount = (count as any)?.cnt ?? 0;
-
-  if (currentCount >= maxRequests) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    };
-  }
-
-  // Record this request with both ip and user_id
-  await d1.prepare(
-    "INSERT INTO rate_limits (ip, user_id, window_start) VALUES (?1, ?2, ?3)"
-  ).bind(ip, userId || null, now).run();
-
-  return {
-    allowed: true,
-    remaining: maxRequests - currentCount - 1,
-    resetAt: now + RATE_LIMIT_WINDOW_MS,
-  };
+  const limiter = getLimiter(d1);
+  return limiter.check(ip, authenticated, userId);
 }
 
 /** Create the rate_limits table if it doesn't exist */
 export async function ensureRateLimitTable(d1: any): Promise<void> {
-  // Use prepare().run() instead of exec() — exec() fails with multi-line SQL
-  // and has unpredictable behavior in production D1.
-  // See ADR-001: Use d1.prepare() over d1.exec() for all D1 operations.
-  try {
-    await d1.prepare("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL)").run();
-  } catch { /* table already exists */ }
-  try {
-    await d1.prepare("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)").run();
-  } catch { /* index already exists */ }
-  try {
-    await d1.prepare("CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, window_start)").run();
-  } catch { /* index already exists */ }
+  // Delegates to @moikapy/cf-helpers d1-helpers — never d1.exec()
+  await ensureTable(d1, "rate_limits", "ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL");
+  await ensureIndex(d1, "idx_rate_limits_ip", "rate_limits(ip, window_start)");
+  await ensureIndex(d1, "idx_rate_limits_user", "rate_limits(user_id, window_start)");
 }

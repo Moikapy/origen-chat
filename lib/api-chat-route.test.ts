@@ -167,4 +167,16 @@ describe("POST /api/chat — Model ID Handling", () => {
     expect(stripOpenrouterPrefix("openrouter/anthropic/claude-sonnet-4")).toBe("anthropic/claude-sonnet-4");
     expect(stripOpenrouterPrefix("anthropic/claude-sonnet-4")).toBe("anthropic/claude-sonnet-4");
   });
+
+  it("cf-helpers SSRF guard blocks private IPs", async () => {
+    const { validateUrl } = await import("@moikapy/cf-helpers/ssrf");
+    expect(validateUrl("http://10.0.0.1/internal").ok).toBe(false);
+    expect(validateUrl("https://api.example.com/endpoint").ok).toBe(true);
+  });
+
+  it("cf-helpers error classifier works", async () => {
+    const { classifyError } = await import("@moikapy/cf-helpers/error");
+    expect(classifyError("429 Too Many Requests")).toBe("rate_limit");
+    expect(classifyError("Connection interrupted")).toBe("network");
+  });
 });
