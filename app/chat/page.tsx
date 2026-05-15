@@ -39,6 +39,7 @@ function ChatPageInner() {
     editAndResend,
     updateSystemPrompt,
     syncOnAuth,
+    regenerateLastResponse,
   } = useSessions();
   const sessionsLoading = loading;
 
@@ -445,6 +446,145 @@ function ChatPageInner() {
     }
   }, [streaming, activeId, model, editAndResend, appendMessage, updateLastMessage, finalizeMessage]);
 
+  // Regenerate last assistant response
+  const handleRegenerate = useCallback(async () => {
+    if (streaming || !activeId) return;
+
+    const updated = await regenerateLastResponse();
+    if (!updated) return;
+
+    setStreaming(true);
+    const assistantMsg: SessionMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "",
+      streaming: true,
+    };
+    await appendMessage(assistantMsg, activeId);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const timeout = setTimeout(() => abort.abort(), 60_000);
+
+    try {
+      const auth = getAuthConfig();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updated.messages.map((m: SessionMessage) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          model,
+          wiki: true,
+          systemPrompt: activeSession?.systemPrompt || undefined,
+          ...auth,
+        }),
+        signal: abort.signal,
+      });
+
+      if (!res.ok) {
+        let errMsg = "Request failed (" + res.status + ")";
+        try {
+          const errBody = (await res.json()) as { error?: string };
+          errMsg = errBody.error || errMsg;
+        } catch {
+          errMsg = await res.text();
+        }
+        await finalizeMessage({ content: errMsg, streaming: false, isError: true }, activeId);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) return;
+
+      let buffer = "";
+      let currentReasoning = "";
+      let currentContent = "";
+      let currentToolCalls: SessionMessage["toolCalls"] = [];
+      let currentToolName = "";
+      let currentToolArgs: Record<string, unknown> = {};
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") continue;
+
+          try {
+            const event: StreamEvent = JSON.parse(data);
+            switch (event.type) {
+              case "reasoning":
+                currentReasoning += event.content;
+                updateLastMessage({ reasoning: currentReasoning }, activeId);
+                break;
+              case "text":
+                currentContent += event.content;
+                updateLastMessage({ content: currentContent }, activeId);
+                break;
+              case "tool_call":
+                currentToolName = event.name;
+                currentToolArgs = event.args;
+                break;
+              case "tool_result":
+                currentToolCalls = [
+                  ...(currentToolCalls ?? []),
+                  { name: currentToolName, args: currentToolArgs, result: event.result },
+                ];
+                updateLastMessage({ toolCalls: currentToolCalls }, activeId);
+                break;
+              case "done":
+                await finalizeMessage({
+                  content: currentContent || undefined,
+                  reasoning: currentReasoning || undefined,
+                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
+                  citations: event.citations,
+                  usage: event.usage,
+                  streaming: false,
+                }, activeId);
+                break;
+              case "error":
+                const errorContent = currentContent
+                  ? currentContent + "\n\n" + event.message
+                  : event.message;
+                await finalizeMessage({
+                  content: errorContent,
+                  streaming: false,
+                  isError: true,
+                }, activeId);
+                break;
+            }
+          } catch {
+            /* skip malformed SSE */
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // User cancelled
+      } else {
+        await finalizeMessage({
+          content: err instanceof Error ? err.message : "Unknown error",
+          streaming: false,
+          isError: true,
+        }, activeId);
+      }
+    } finally {
+      clearTimeout(timeout);
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }, [streaming, activeId, model, activeSession, regenerateLastResponse, appendMessage, updateLastMessage, finalizeMessage]);
+
   const messages = activeSession?.messages ?? [];
 
   return (
@@ -538,7 +678,14 @@ function ChatPageInner() {
               </div>
             )}
             {messages.map((msg, idx) => (
-              <ChatMessage key={msg.id} message={msg} index={idx} onEdit={handleEditAndResend} streaming={streaming && idx === messages.length - 1 && msg.role === "assistant"} />
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                index={idx}
+                onEdit={handleEditAndResend}
+                onRegenerate={msg.role === "assistant" && idx === messages.length - 1 ? handleRegenerate : undefined}
+                streaming={streaming && idx === messages.length - 1 && msg.role === "assistant"}
+              />
             ))}
             {streaming && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground">

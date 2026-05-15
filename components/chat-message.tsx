@@ -57,11 +57,12 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 interface ChatMessageProps {
   message: SessionMessage;
   onEdit?: (index: number, newContent: string) => void;
+  onRegenerate?: () => void;
   index: number;
   streaming?: boolean;
 }
 
-export function ChatMessage({ message, onEdit, index, streaming }: ChatMessageProps) {
+export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isError = message.isError;
   const [editing, setEditing] = useState(false);
@@ -140,7 +141,7 @@ export function ChatMessage({ message, onEdit, index, streaming }: ChatMessagePr
 
   // Assistant messages
   return (
-    <div className="mr-auto max-w-[100%] space-y-2 group relative">
+    <div className="mr-auto max-w-[100%] space-y-2 group/assistant relative">
       {/* Reasoning block */}
       {message.reasoning && (
         <details className="group/reason">
@@ -234,7 +235,16 @@ export function ChatMessage({ message, onEdit, index, streaming }: ChatMessagePr
               )}
             </div>
           </div>
-          <div className="absolute -bottom-5 left-0">
+          <div className="absolute -bottom-5 left-0 flex gap-2">
+            {!streaming && onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="opacity-0 group-hover/assistant:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/50"
+                title="Regenerate response"
+              >
+                Retry
+              </button>
+            )}
             <CopyButton text={message.content} />
           </div>
         </div>

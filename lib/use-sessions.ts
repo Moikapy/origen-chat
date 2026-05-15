@@ -220,6 +220,26 @@ export function useSessions() {
     [activeId, refreshList],
   );
 
+  // Regenerate: remove last assistant message, ready for re-send
+  const regenerateLastResponse = useCallback(async () => {
+    if (!activeId || !activeSession) return null;
+    const msgs = activeSession.messages;
+    if (msgs.length === 0) return null;
+    // Find the last assistant message and remove it
+    const lastAssistantIdx = msgs.reduce((acc: number, m, i) => m.role === "assistant" ? i : acc, -1);
+    if (lastAssistantIdx === -1) return null;
+    const newMessages = msgs.slice(0, lastAssistantIdx);
+    const updated: Session = {
+      ...activeSession,
+      messages: newMessages,
+      updatedAt: Date.now(),
+    };
+    await saveSession(updated);
+    setActiveSession(updated);
+    await refreshList();
+    return updated;
+  }, [activeId, activeSession, refreshList]);
+
   return {
     sessions,
     activeId,
@@ -236,5 +256,6 @@ export function useSessions() {
     editAndResend,
     updateSystemPrompt,
     syncOnAuth,
+    regenerateLastResponse,
   };
 }
