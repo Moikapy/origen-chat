@@ -8,17 +8,20 @@ export interface UIModel {
   name: string;
   description: string;
   free: boolean;
+  /** Whether this model supports OpenRouter tool/function calling. Defaults to true. */
+  tools?: boolean;
   pricing?: { prompt: string; completion: string };
 }
 
 export const MODELS: Record<string, UIModel> = {
   // ── Free ──────────────────────────────────────────────────────────────
-  "openrouter/free":                          { name: "Free",                description: "Auto-selects best free model",        free: true },
-  "openrouter/deepseek/deepseek-chat-v3-0324:free":  { name: "DeepSeek V3",        description: "DeepSeek Chat V3",                    free: true },
-  "openrouter/deepseek/deepseek-r1:free":     { name: "DeepSeek R1",         description: "DeepSeek reasoning model",              free: true },
-  "openrouter/google/gemini-2.0-flash-exp:free":  { name: "Gemini 2.0 Flash",   description: "Google Gemini Flash",                  free: true },
-  "openrouter/nvidia/nemotron-3-super:free":   { name: "Nemotron 3 Super",    description: "NVIDIA 120B MoE (free)",                free: true },
-  "openrouter/inclusionai/ring-2.6-1t:free":  { name: "Ring 2.6",            description: "inclusionAI 1T-parameter (free)",        free: true },
+  // Free models typically don't support tool use on OpenRouter
+  "openrouter/free":                          { name: "Free",                description: "Auto-selects best free model",        free: true, tools: false },
+  "openrouter/deepseek/deepseek-chat-v3-0324:free":  { name: "DeepSeek V3",        description: "DeepSeek Chat V3",                    free: true, tools: false },
+  "openrouter/deepseek/deepseek-r1:free":     { name: "DeepSeek R1",         description: "DeepSeek reasoning model",              free: true, tools: false },
+  "openrouter/google/gemini-2.0-flash-exp:free":  { name: "Gemini 2.0 Flash",   description: "Google Gemini Flash",                  free: true, tools: false },
+  "openrouter/nvidia/nemotron-3-super:free":   { name: "Nemotron 3 Super",    description: "NVIDIA 120B MoE (free)",                free: true, tools: false },
+  "openrouter/inclusionai/ring-2.6-1t:free":  { name: "Ring 2.6",            description: "inclusionAI 1T-parameter (free)",        free: true, tools: false },
 
   // ── Premium: Claude ──────────────────────────────────────────────────
   "openrouter/anthropic/claude-sonnet-4":     { name: "Claude Sonnet 4",     description: "Anthropic Claude Sonnet 4",             free: false, pricing: { prompt: "$3.00", completion: "$15.00" } },
@@ -44,8 +47,30 @@ export const MODELS: Record<string, UIModel> = {
   "openrouter/x-ai/grok-3":                  { name: "Grok 3",              description: "xAI Grok 3",                             free: false, pricing: { prompt: "$3.00", completion: "$15.00" } },
 
   // ── Premium: Mistral ─────────────────────────────────────────────────
-  "openrouter/mistralai/mistral-3.1-small":    { name: "Mistral 3.1 Small",  description: "Mistral Small (fast)",                   free: false, pricing: { prompt: "$0.10", completion: "$0.30" } },
+  "openrouter/mistralai/mistral-3.1-small":    { name: "Mistral 3.1 Small",  description: "Mistral Small (fast)",                   free: false, tools: true, pricing: { prompt: "$0.10", completion: "$0.30" } },
 };
+
+/** Check if a model is free on OpenRouter. Free models cost $0 but need auth. */
+export function isFreeModel(model: string): boolean {
+  return model === "openrouter/free" || model.endsWith(":free") || model.startsWith("openrouter/free");
+}
+
+/** Check if a model supports tool/function calling. Defaults to true for premium models. */
+export function modelSupportsTools(modelId: string): boolean {
+  const model = MODELS[modelId];
+  if (!model) return false; // unknown model — be safe
+  return model.tools ?? true; // premium models default to tools=true
+}
+
+/** Strip "openrouter/" prefix for API calls.
+ * UI IDs like "openrouter/deepseek/deepseek-v4-flash:free" become "deepseek/deepseek-v4-flash:free".
+ * But "openrouter/free" stays as-is since @moikapy/origen knows it directly.
+ */
+export function stripOpenrouterPrefix(model: string): string {
+  if (model === "openrouter/free") return model;
+  if (model.startsWith("openrouter/")) return model.slice("openrouter/".length);
+  return model;
+}
 
 export const MODEL_GROUPS = [
   {
