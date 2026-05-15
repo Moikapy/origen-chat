@@ -1,5 +1,6 @@
 import { streamOrigen, type StreamEvent } from "@moikapy/origen";
 import { buildAgentConfig, type ChatConfig } from "@/lib/config";
+import { isFreeModel as checkIsFreeModel, stripOpenrouterPrefix } from "@/lib/models";
 import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
@@ -13,24 +14,7 @@ interface ChatRequest {
   ollamaApiKey?: string;
 }
 
-/**
- * Is this model free on OpenRouter?
- * Free models have the ":free" suffix or are the "openrouter/free" router.
- * They cost $0 to call but still require an API key for authentication.
- */
-function isFreeModel(model: string): boolean {
-  return model === "openrouter/free" || model.endsWith(":free") || model.startsWith("openrouter/free");
-}
 
-/**
- * Strip "openrouter/" prefix for API calls.
- * Our UI uses "openrouter/deepseek/deepseek-r1:free" but OpenRouter API
- * expects just "deepseek/deepseek-r1:free".
- */
-function stripOpenrouterPrefix(model: string): string {
-  if (model.startsWith("openrouter/")) return model.slice("openrouter/".length);
-  return model;
-}
 
 /** Get Cloudflare Workers env (with fallback for local dev) */
 async function getEnv(): Promise<Record<string, string | undefined>> {
@@ -67,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
   const userKey = cookieApiKey || ollamaApiKey || "";
 
   // 3. Determine final API key
-  const freeModel = isFreeModel(model);
+  const freeModel = checkIsFreeModel(model);
   const serverFreeKey = env.OPENROUTER_FREE_KEY || "";
 
   let apiKey: string;

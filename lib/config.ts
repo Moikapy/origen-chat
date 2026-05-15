@@ -1,5 +1,6 @@
-import { type OrigenTool, type ModelId, type AgentConfig, type D1Like } from "@moikapy/origen";
-import { createWikipediaTool } from "./tools/wikipedia";
+import { type ModelId, type AgentConfig, type D1Like } from "@moikapy/origen";
+import { modelSupportsTools } from "./models";
+import { createTools } from "./tools";
 
 export interface ChatConfig {
   model: ModelId | string;
@@ -10,21 +11,12 @@ export interface ChatConfig {
 }
 
 /**
- * Is this model free on OpenRouter?
- * Free models typically don't support tool use.
- */
-function isFreeModel(model: string): boolean {
-  return model === "free" || model === "openrouter/free" || model.endsWith(":free");
-}
-
-/**
  * Build an AgentConfig from the chat request parameters.
+ * Tools are only included for models that support tool use on OpenRouter.
  */
 export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknown>): AgentConfig {
-  // Free models generally don't support tool use — skip tools for them
-  const skipTools = isFreeModel(config.model);
-
-  const tools: OrigenTool[] = skipTools ? [] : [createWikipediaTool()];
+  const supportsTools = modelSupportsTools(config.model);
+  const tools = createTools(supportsTools);
 
   return {
     appName: "Origen Chat",
@@ -37,6 +29,6 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
     },
     ollamaBaseUrl: config.ollamaBaseUrl,
     wiki: config.wiki ? { type: "cloud" as const } : undefined,
-    maxSteps: skipTools ? 1 : 10,
+    maxSteps: supportsTools ? 10 : 1,
   };
 }
