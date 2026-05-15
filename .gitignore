@@ -13,3 +13,4 @@ bun.lock
 .dev.vars
 scripts/.env
 scripts/
+coverage/
