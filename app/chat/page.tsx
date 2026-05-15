@@ -220,11 +220,10 @@ function ChatPageInner() {
       if (!res.ok) {
         let errMsg = `Request failed (${res.status})`;
         try {
-          const errBody = (await res.json()) as { error?: string };
-          errMsg = errBody.error || errMsg;
-        } catch {
-          errMsg = await res.text();
-        }
+          const text = await res.text();
+          const parsed = JSON.parse(text) as { error?: string };
+          errMsg = parsed.error || errMsg;
+        } catch { /* not JSON, use default */ }
         await finalizeMessage({ content: errMsg, streaming: false }, sessionId);
         return;
       }
@@ -362,7 +361,7 @@ function ChatPageInner() {
 
       if (!res.ok) {
         let errMsg = `Request failed (${res.status})`;
-        try { const err = await res.json() as { error?: string }; errMsg = err.error || errMsg; } catch { /* */ }
+        try { const t = await res.text(); const p = JSON.parse(t) as { error?: string }; errMsg = p.error || errMsg; } catch { /* */ }
         await finalizeMessage({ content: errMsg, streaming: false }, activeId);
         return;
       }
@@ -487,11 +486,10 @@ function ChatPageInner() {
       if (!res.ok) {
         let errMsg = "Request failed (" + res.status + ")";
         try {
-          const errBody = (await res.json()) as { error?: string };
-          errMsg = errBody.error || errMsg;
-        } catch {
-          errMsg = await res.text();
-        }
+          const text = await res.text();
+          const parsed = JSON.parse(text) as { error?: string };
+          errMsg = parsed.error || errMsg;
+        } catch { /* not JSON, use default */ }
         await finalizeMessage({ content: errMsg, streaming: false, isError: true }, activeId);
         return;
       }
