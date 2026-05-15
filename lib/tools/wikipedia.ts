@@ -33,6 +33,17 @@ export function createWikipediaTool(): OrigenTool {
       const query = args.query as string;
       const sentences = (args.sentences as number) ?? 5;
       try {
+        // Fetch with 10s timeout to prevent stalling the agent
+        const fetchWithTimeout = async (url: string, ms = 10_000) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), ms);
+          try {
+            return await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: controller.signal });
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+
         // Use the MediaWiki action API with extracts — works server-side with User-Agent
         const url = new URL("https://en.wikipedia.org/w/api.php");
         url.searchParams.set("action", "query");
@@ -41,9 +52,7 @@ export function createWikipediaTool(): OrigenTool {
         url.searchParams.set("srlimit", "1");
         url.searchParams.set("format", "json");
 
-        const searchRes = await fetch(url.toString(), {
-          headers: { "User-Agent": USER_AGENT },
-        });
+        const searchRes = await fetchWithTimeout(url.toString());
         if (!searchRes.ok) return `Error searching Wikipedia: ${searchRes.status} ${searchRes.statusText}`;
 
         const searchData = await searchRes.json() as {
@@ -66,9 +75,7 @@ export function createWikipediaTool(): OrigenTool {
         extractUrl.searchParams.set("format", "json");
         extractUrl.searchParams.set("redirects", "1");
 
-        const extractRes = await fetch(extractUrl.toString(), {
-          headers: { "User-Agent": USER_AGENT },
-        });
+        const extractRes = await fetchWithTimeout(extractUrl.toString());
         if (!extractRes.ok) return `Error fetching Wikipedia article for "${title}".`;
 
         const extractData = await extractRes.json() as {
@@ -97,6 +104,9 @@ export function createWikipediaTool(): OrigenTool {
           .filter(Boolean)
           .join("\n");
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return `Wikipedia lookup timed out for "${query}". Try again later.`;
+        }
         return `Wikipedia lookup failed: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
     },

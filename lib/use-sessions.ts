@@ -164,6 +164,32 @@ export function useSessions() {
     setActiveSession(null);
   }, []);
 
+  // Truncate messages after a given index and update the last user message
+  // Used for edit-and-resend: keeps messages up to editIndex, replaces message at editIndex
+  const editAndResend = useCallback(
+    async (editIndex: number, newContent: string) => {
+      const id = activeId;
+      if (!id || !activeSession) return null;
+      const truncatedMessages = activeSession.messages.slice(0, editIndex);
+      // Replace the message at editIndex with new content
+      const editedMessage: SessionMessage = {
+        ...activeSession.messages[editIndex],
+        content: newContent,
+      };
+      const newMessages = [...truncatedMessages, editedMessage];
+      const updated: Session = {
+        ...activeSession,
+        messages: newMessages,
+        updatedAt: Date.now(),
+      };
+      await saveSession(updated);
+      setActiveSession(updated);
+      await refreshList();
+      return updated;
+    },
+    [activeId, activeSession, refreshList],
+  );
+
   return {
     sessions,
     activeId,
@@ -177,5 +203,6 @@ export function useSessions() {
     updateLastMessage,
     finalizeMessage,
     clearActive,
+    editAndResend,
   };
 }

@@ -32,7 +32,6 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
   const lang = match ? match[1] : "";
   const code = String(children).replace(/\n$/, "");
 
-  // If it's a code block (has language or is multi-line), render with header
   if (lang || code.includes("\n")) {
     return (
       <div className="relative group my-3 rounded-lg border border-border bg-[#0d1117] overflow-hidden">
@@ -47,7 +46,6 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
     );
   }
 
-  // Inline code
   return (
     <code className="px-1.5 py-0.5 rounded bg-muted/50 text-foreground font-mono text-sm">
       {children}
@@ -55,25 +53,89 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
   );
 }
 
-/**
- * Renders a chat message as separate visual blocks (TUI-style).
- */
-export function ChatMessage({ message }: { message: SessionMessage }) {
+interface ChatMessageProps {
+  message: SessionMessage;
+  onEdit?: (index: number, newContent: string) => void;
+  index: number;
+}
+
+export function ChatMessage({ message, onEdit, index }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content);
 
   if (isUser) {
+    if (editing) {
+      return (
+        <div className="ml-auto max-w-[80%]">
+          <div className="rounded-lg bg-foreground text-background p-3">
+            <textarea
+              className="w-full bg-transparent text-background resize-none outline-none text-sm min-h-[2rem]"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (editText.trim()) {
+                    onEdit?.(index, editText.trim());
+                    setEditing(false);
+                  }
+                }
+                if (e.key === "Escape") {
+                  setEditText(message.content);
+                  setEditing(false);
+                }
+              }}
+              autoFocus
+              rows={2}
+            />
+            <div className="flex gap-2 justify-end mt-2">
+              <button
+                onClick={() => {
+                  setEditText(message.content);
+                  setEditing(false);
+                }}
+                className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (editText.trim()) {
+                    onEdit?.(index, editText.trim());
+                    setEditing(false);
+                  }
+                }}
+                className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:opacity-90"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="ml-auto max-w-[80%] group relative">
-        <div className="rounded-lg p-3 bg-foreground text-background">
+        <div className="rounded-lg p-3 bg-foreground text-background cursor-pointer hover:opacity-95 transition-opacity" onDoubleClick={() => setEditing(true)}>
           <div className="text-sm whitespace-pre-wrap">{message.content}</div>
         </div>
-        <div className="absolute -bottom-5 right-0">
+        <div className="absolute -bottom-5 right-0 flex gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/50"
+            title="Edit message"
+          >
+            Edit
+          </button>
           <CopyButton text={message.content} />
         </div>
       </div>
     );
   }
 
+  // Assistant messages
   return (
     <div className="mr-auto max-w-[100%] space-y-2 group relative">
       {/* Reasoning block */}

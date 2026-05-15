@@ -35,6 +35,7 @@ export default function ChatPage() {
     updateLastMessage,
     finalizeMessage,
     clearActive,
+    editAndResend,
   } = useSessions();
 
   const [streaming, setStreaming] = useState(false);
@@ -245,6 +246,129 @@ export default function ChatPage() {
     }
   }, [editor, streaming, model, activeId, activeSession, appendMessage, updateLastMessage, finalizeMessage, createNew]);
 
+  const handleEditAndResend = useCallback(async (editIndex: number, newContent: string) => {
+    if (streaming || !activeId) return;
+
+    // Truncate messages and update the edited user message
+    const updated = await editAndResend(editIndex, newContent);
+    if (!updated) return;
+
+    // Now resend from that point
+    setStreaming(true);
+    const assistantMsg: SessionMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "",
+      streaming: true,
+    };
+    await appendMessage(assistantMsg, activeId);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const timeout = setTimeout(() => abort.abort(), 60_000);
+
+    try {
+      const auth = getAuthConfig();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updated.messages.map((m: SessionMessage) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          model,
+          wiki: true,
+          ...auth,
+        }),
+        signal: abort.signal,
+      });
+
+      if (!res.ok) {
+        let errMsg = `Request failed (${res.status})`;
+        try { const err = await res.json() as { error?: string }; errMsg = err.error || errMsg; } catch { /* */ }
+        await finalizeMessage({ content: errMsg, streaming: false }, activeId);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) return;
+
+      let buffer = "";
+      let currentReasoning = "";
+      let currentContent = "";
+      let currentToolCalls: SessionMessage["toolCalls"] = [];
+      let currentToolName = "";
+      let currentToolArgs: Record<string, unknown> = {};
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") continue;
+          try {
+            const event: StreamEvent = JSON.parse(data);
+            switch (event.type) {
+              case "reasoning":
+                currentReasoning += event.content;
+                updateLastMessage({ reasoning: currentReasoning }, activeId);
+                break;
+              case "text":
+                currentContent += event.content;
+                updateLastMessage({ content: currentContent }, activeId);
+                break;
+              case "tool_call":
+                currentToolName = event.name;
+                currentToolArgs = event.args;
+                break;
+              case "tool_result":
+                currentToolCalls = [
+                  ...(currentToolCalls ?? []),
+                  { name: currentToolName, args: currentToolArgs, result: event.result },
+                ];
+                updateLastMessage({ toolCalls: currentToolCalls }, activeId);
+                break;
+              case "done":
+                await finalizeMessage({
+                  content: currentContent || undefined,
+                  reasoning: currentReasoning || undefined,
+                  toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
+                  citations: event.citations,
+                  usage: event.usage,
+                  streaming: false,
+                }, activeId);
+                break;
+              case "error":
+                const errorContent = currentContent
+                  ? `${currentContent}\n\n⚠️ Error: ${event.message}`
+                  : `Error: ${event.message}`;
+                await finalizeMessage({ content: errorContent, streaming: false }, activeId);
+                break;
+            }
+          } catch { /* skip */ }
+        }
+      }
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        await finalizeMessage({
+          content: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
+          streaming: false,
+        }, activeId);
+      }
+    } finally {
+      clearTimeout(timeout);
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }, [streaming, activeId, model, editAndResend, appendMessage, updateLastMessage, finalizeMessage]);
+
   const messages = activeSession?.messages ?? [];
 
   return (
@@ -332,8 +456,8 @@ export default function ChatPage() {
                 <p className="text-lg">Start a conversation or pick a model above.</p>
               </div>
             )}
-            {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
+            {messages.map((msg, idx) => (
+              <ChatMessage key={msg.id} message={msg} index={idx} onEdit={handleEditAndResend} />
             ))}
             {streaming && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-2 text-muted-foreground">

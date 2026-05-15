@@ -2,6 +2,7 @@ import { streamOrigen, type StreamEvent } from "@moikapy/origen";
 import { buildAgentConfig, type ChatConfig } from "@/lib/config";
 import { isFreeModel as checkIsFreeModel, stripOpenrouterPrefix } from "@/lib/models";
 import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
+import { validateChatRequest, checkRateLimit, ensureRateLimitTable } from "@/lib/security";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
 export const maxDuration = 60;
@@ -34,11 +35,49 @@ async function getEnv(): Promise<Record<string, string | undefined>> {
 
 export async function POST(request: Request): Promise<Response> {
   const body: ChatRequest = await request.json();
-  const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey } = body;
+
+  // ── Input validation ──
+  const validation = validateChatRequest(body);
+  if (!validation.ok) {
+    return new Response(
+      JSON.stringify({ error: validation.error }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
   const env = await getEnv();
 
+  // ── Rate limiting (per-IP via D1) ──
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const d1 = (env as Record<string, unknown>).DB as any;
+  if (d1) {
+    await ensureRateLimitTable(d1);
+    const cookieApiKey = await getApiKeyFromCookie({
+      encryptKey: env.OPENROUTER_ENCRYPT_KEY!,
+      previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
+    });
+    const hasAuthKey = !!(cookieApiKey || body.ollamaApiKey);
+    const rateResult = await checkRateLimit(d1, ip, hasAuthKey);
+    if (!rateResult.allowed) {
+      const retryAfterSec = Math.ceil((rateResult.resetAt - Date.now()) / 1000);
+      return new Response(
+        JSON.stringify({
+          error: `Rate limit reached. ${hasAuthKey ? "" : "Sign in for higher limits. "}Try again in ${retryAfterSec}s.`,
+          retryAfter: retryAfterSec,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(retryAfterSec),
+          },
+        },
+      );
+    }
+  }
+
   // Strip openrouter/ prefix for API calls
+  const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey } = body;
   const apiModel = stripOpenrouterPrefix(model);
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
