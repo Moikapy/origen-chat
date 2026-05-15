@@ -22,6 +22,16 @@ function isFreeModel(model: string): boolean {
   return model === "openrouter/free" || model.endsWith(":free") || model.startsWith("openrouter/free");
 }
 
+/**
+ * Strip "openrouter/" prefix for API calls.
+ * Our UI uses "openrouter/deepseek/deepseek-r1:free" but OpenRouter API
+ * expects just "deepseek/deepseek-r1:free".
+ */
+function stripOpenrouterPrefix(model: string): string {
+  if (model.startsWith("openrouter/")) return model.slice("openrouter/".length);
+  return model;
+}
+
 /** Get Cloudflare Workers env (with fallback for local dev) */
 async function getEnv(): Promise<Record<string, string | undefined>> {
   try {
@@ -43,6 +53,9 @@ export async function POST(request: Request): Promise<Response> {
   const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey } = body;
 
   const env = await getEnv();
+
+  // Strip openrouter/ prefix for API calls
+  const apiModel = stripOpenrouterPrefix(model);
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
   const cookieApiKey = await getApiKeyFromCookie({
@@ -91,7 +104,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const config = buildAgentConfig(
-    { model, wiki, provider, apiKey, ollamaBaseUrl } as ChatConfig,
+    { model: apiModel, wiki, provider, apiKey, ollamaBaseUrl } as ChatConfig,
     async () => {
       throw new Error("D1 not configured");
     },

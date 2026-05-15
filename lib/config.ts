@@ -10,10 +10,21 @@ export interface ChatConfig {
 }
 
 /**
+ * Is this model free on OpenRouter?
+ * Free models typically don't support tool use.
+ */
+function isFreeModel(model: string): boolean {
+  return model === "free" || model === "openrouter/free" || model.endsWith(":free");
+}
+
+/**
  * Build an AgentConfig from the chat request parameters.
  */
 export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknown>): AgentConfig {
-  const tools: OrigenTool[] = [createWikipediaTool()];
+  // Free models generally don't support tool use — skip tools for them
+  const skipTools = isFreeModel(config.model);
+
+  const tools: OrigenTool[] = skipTools ? [] : [createWikipediaTool()];
 
   return {
     appName: "Origen Chat",
@@ -26,6 +37,6 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
     },
     ollamaBaseUrl: config.ollamaBaseUrl,
     wiki: config.wiki ? { type: "cloud" as const } : undefined,
-    maxSteps: 10,
+    maxSteps: skipTools ? 1 : 10,
   };
 }
