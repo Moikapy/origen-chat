@@ -10,13 +10,27 @@ export interface ChatConfig {
   ollamaBaseUrl?: string;
 }
 
+/** Check if a model is a free model on OpenRouter. */
+function isFreeModelId(model: string): boolean {
+  return model === "free" || model.endsWith(":free");
+}
+
 /**
  * Build an AgentConfig from the chat request parameters.
- * Tools are only included for models that support tool use on OpenRouter.
+ * Free models get fewer agent steps and no wiki tools to reduce API calls
+ * and avoid hitting the free tier rate limit (~20 req/min).
  */
 export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknown>): AgentConfig {
   const supportsTools = modelSupportsTools(config.model);
+  const isFree = isFreeModelId(config.model);
   const tools = createTools(supportsTools);
+
+  // Free models get fewer steps to avoid rate limits.
+  // Each step = 1 API call. Free tier allows ~20 req/min.
+  // With tools: 3 steps = user-msg + tool-call + response = 3 calls.
+  // Without tools: 1 step = 1 call.
+  // Premium models: up to 10 steps.
+  const maxSteps = !supportsTools ? 1 : isFree ? 3 : 10;
 
   return {
     appName: "Origen Chat",
@@ -28,9 +42,9 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
       return undefined;
     },
     ollamaBaseUrl: config.ollamaBaseUrl,
-    // Wiki and tools both require models that support function/tool calling.
-    // Free models and models without tool support will 404 if given tools.
-    wiki: config.wiki && supportsTools ? { type: "cloud" as const } : undefined,
-    maxSteps: supportsTools ? 10 : 1,
+    // Wiki tools require D1 + multiple API calls. Skip for free models
+    // to avoid rate limiting. Premium users get the full wiki experience.
+    wiki: config.wiki && supportsTools && !isFree ? { type: "cloud" as const } : undefined,
+    maxSteps,
   };
 }

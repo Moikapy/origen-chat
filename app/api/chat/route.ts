@@ -106,9 +106,17 @@ export async function POST(request: Request): Promise<Response> {
         }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        
+        // Detect rate limit errors and provide helpful message
+        const is429 = errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('Rate limit');
+        const rateLimitMessage = is429
+          ? 'Rate limit hit. Free models have ~20 requests/min. Sign in with OpenRouter for higher limits, or wait a moment and try again.'
+          : `Error: ${errorMsg}`;
+        
         const errorEvent: StreamEvent = {
           type: "error",
-          message: err instanceof Error ? err.message : "Unknown error",
+          message: rateLimitMessage,
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
       } finally {

@@ -151,7 +151,7 @@ export default function ChatPage() {
         } catch {
           errMsg = await res.text();
         }
-        await finalizeMessage({ content: errMsg, streaming: false });
+        await finalizeMessage({ content: errMsg, streaming: false }, sessionId);
         return;
       }
 
@@ -184,13 +184,13 @@ export default function ChatPage() {
             switch (event.type) {
               case "reasoning":
                 currentReasoning += event.content;
-                updateLastMessage({ reasoning: currentReasoning });
+                updateLastMessage({ reasoning: currentReasoning }, sessionId);
                 break;
               case "text":
                 currentContent += event.content;
                 updateLastMessage({
                   content: currentContent,
-                });
+                }, sessionId);
                 break;
               case "tool_call":
                 currentToolName = event.name;
@@ -201,7 +201,7 @@ export default function ChatPage() {
                   ...(currentToolCalls ?? []),
                   { name: currentToolName, args: currentToolArgs, result: event.result },
                 ];
-                updateLastMessage({ toolCalls: currentToolCalls });
+                updateLastMessage({ toolCalls: currentToolCalls }, sessionId);
                 break;
               case "done":
                 await finalizeMessage({
@@ -211,7 +211,7 @@ export default function ChatPage() {
                   citations: event.citations,
                   usage: event.usage,
                   streaming: false,
-                });
+                }, sessionId);
                 break;
               case "error":
                 // Preserve any content that was already streamed before the error
@@ -221,7 +221,7 @@ export default function ChatPage() {
                 await finalizeMessage({
                   content: errorContent,
                   streaming: false,
-                });
+                }, sessionId);
                 break;
             }
           } catch {
@@ -236,7 +236,7 @@ export default function ChatPage() {
         await finalizeMessage({
           content: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
           streaming: false,
-        });
+        }, sessionId);
       }
     } finally {
       clearTimeout(timeout);
