@@ -28,7 +28,9 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
       return undefined;
     },
     ollamaBaseUrl: config.ollamaBaseUrl,
-    wiki: config.wiki ? { type: "cloud" as const } : undefined,
+    // Wiki and tools both require models that support function/tool calling.
+    // Free models and models without tool support will 404 if given tools.
+    wiki: config.wiki && supportsTools ? { type: "cloud" as const } : undefined,
     maxSteps: supportsTools ? 10 : 1,
   };
 }
