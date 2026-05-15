@@ -221,7 +221,16 @@ export async function checkRateLimit(
 
 /** Create the rate_limits table if it doesn't exist */
 export async function ensureRateLimitTable(d1: any): Promise<void> {
-  await d1.exec("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL)");
-  await d1.exec("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)");
-  await d1.exec("CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, window_start)").catch(() => {});
+  // Use prepare().run() instead of exec() — exec() fails with multi-line SQL
+  // and has unpredictable behavior in production D1.
+  // See ADR-001: Use d1.prepare() over d1.exec() for all D1 operations.
+  try {
+    await d1.prepare("CREATE TABLE IF NOT EXISTS rate_limits (ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL)").run();
+  } catch { /* table already exists */ }
+  try {
+    await d1.prepare("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip, window_start)").run();
+  } catch { /* index already exists */ }
+  try {
+    await d1.prepare("CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, window_start)").run();
+  } catch { /* index already exists */ }
 }
