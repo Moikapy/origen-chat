@@ -1,0 +1,20 @@
+--- a/dist/providers/transform-messages.js
++++ b/dist/providers/transform-messages.js
+@@ -59,6 +59,18 @@
+             return msg;
+         }
++        // Normalize string content on assistant messages
++        // pi-agent-core may produce assistant messages with string content,
++        // but transformMessages expects arrays of content blocks.
++        // Without this, .flatMap() crashes: "assistantMsg.content.flatMap is not a function"
++        if (msg.role === "assistant" && typeof msg.content === "string") {
++            const text = msg.content;
++            msg = {
++                ...msg,
++                content: text ? [{ type: "text", text }] : [],
++            };
++        }
++
+         // Assistant messages need transformation check
+         if (msg.role === "assistant") {
+             const assistantMsg = msg;

@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "postinstall": "node scripts/postinstall.cjs"
   },
   "dependencies": {
     "@0xkobold/warm-editorial": "file:../warm-editorial",
