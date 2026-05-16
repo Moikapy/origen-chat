@@ -3,6 +3,7 @@ import { buildAgentConfig, type ChatConfig } from "@/lib/config";
 import { isFreeModel as checkIsFreeModel, stripOpenrouterPrefix } from "@/lib/models";
 import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
 import { validateChatRequest, checkRateLimit, ensureRateLimitTable } from "@/lib/security";
+import { getMemoryFromD1, formatMemoryForPrompt } from "@/lib/memory-store";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
 export const maxDuration = 60;
@@ -11,6 +12,7 @@ interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   model: string;
   wiki: boolean;
+  systemPrompt?: string;
   ollamaBaseUrl?: string;
   ollamaApiKey?: string;
 }
@@ -60,12 +62,14 @@ async function handleChatRequest(request: Request): Promise<Response> {
   const env = await getEnv();
 
   // ── Rate limiting (per-IP via D1) ──
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const d1 = (env as Record<string, unknown>).DB as any;
+  let hasAuthKey = !!(body.ollamaApiKey);
+
+  // ── Rate limiting (per-IP via D1) ──
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  let userId: string | null = null;
   if (d1) {
     await ensureRateLimitTable(d1);
-    let hasAuthKey = !!(body.ollamaApiKey);
-    let userId: string | null = null;
     try {
       if (env.OPENROUTER_ENCRYPT_KEY) {
         const ck = await getApiKeyFromCookie({
@@ -97,8 +101,23 @@ async function handleChatRequest(request: Request): Promise<Response> {
   }
 
   // Strip openrouter/ prefix for API calls
-  const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey } = body;
+  const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey, systemPrompt: bodySystemPrompt } = body;
   const apiModel = stripOpenrouterPrefix(model);
+
+  // ── Load user memory for system prompt injection ──
+  let memorySuffix = "";
+  if (d1 && userId) {
+    try {
+      const db = d1 as D1Database;
+      const facts = await getMemoryFromD1(db, userId);
+      memorySuffix = formatMemoryForPrompt(facts);
+    } catch { /* memory injection is best-effort */ }
+  }
+  const systemPromptWithMemory = bodySystemPrompt
+    ? memorySuffix
+      ? `${bodySystemPrompt}\n\n${memorySuffix}`
+      : bodySystemPrompt
+    : memorySuffix || undefined;
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
   let cookieApiKey: string | null = null;
@@ -154,10 +173,9 @@ async function handleChatRequest(request: Request): Promise<Response> {
   }
 
   const config = buildAgentConfig(
-    { model: apiModel, wiki, provider, apiKey, ollamaBaseUrl } as ChatConfig,
+    { model: apiModel, wiki, systemPrompt: systemPromptWithMemory, provider, apiKey, ollamaBaseUrl } as ChatConfig,
     async () => {
       // D1 binding from Cloudflare Workers env
-      const d1 = (env as Record<string, unknown>).DB as any;
       if (!d1) throw new Error("D1 database not available");
       return d1 as any;
     },

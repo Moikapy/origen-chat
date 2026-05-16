@@ -5,6 +5,7 @@ import { createTools } from "./tools";
 export interface ChatConfig {
   model: ModelId | string;
   wiki: boolean;
+  systemPrompt?: string;
   provider: string;
   apiKey: string;
   ollamaBaseUrl?: string;
@@ -33,6 +34,7 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
 
   return {
     appName: "Origen Chat",
+    systemPrompt: config.systemPrompt,
     model: config.model as ModelId,
     tools,
     getD1: getD1 as () => Promise<D1Like>,
