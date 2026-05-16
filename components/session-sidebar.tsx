@@ -5,6 +5,7 @@ import type { Session } from "@/lib/session-store";
 import { ModelSelector } from "@/components/model-selector";
 import { SkeletonChatItem } from "@/components/skeleton";
 import { useAuth } from "@/lib/auth";
+import { useMemory } from "@/lib/use-memory";
 
 interface SessionSidebarProps {
   sessions: Session[];
@@ -157,6 +158,78 @@ function SessionItem({
   );
 }
 
+/** Memory section for sidebar — shows what the agent remembers about the user */
+function MemorySection() {
+  const { facts, loading, deleteFact, refresh } = useMemory();
+  const [expanded, setExpanded] = useState(false);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+
+  if (loading) return null;
+
+  // Show collapsed if no facts and not expanded
+  if (facts.length === 0 && !expanded) {
+    return (
+      <div className="border-t border-border p-3">
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+        >
+          Memory (empty)
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-border p-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span>Memory ({facts.length})</span>
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+          {facts.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/50">No facts stored yet. Chat to build memory.</p>
+          )}
+          {facts.map((fact) => (
+            <div key={fact.key} className="group flex items-start gap-1 text-[11px]">
+              <span className="text-muted-foreground shrink-0">{fact.key}:</span>
+              <span className="text-foreground/80 truncate flex-1">{fact.value}</span>
+              <button
+                onClick={async () => {
+                  if (deletingKey === fact.key) {
+                    await deleteFact(fact.key);
+                    setDeletingKey(null);
+                  } else {
+                    setDeletingKey(fact.key);
+                    setTimeout(() => setDeletingKey(null), 3000);
+                  }
+                }}
+                className={`shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
+                  deletingKey === fact.key
+                    ? "text-destructive"
+                    : "text-muted-foreground hover:text-destructive"
+                }`}
+                title={deletingKey === fact.key ? "Click again to delete" : "Delete"}
+              >
+                {deletingKey === fact.key ? "x" : "\u00d7"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SessionSidebar({
   sessions,
   activeId,
@@ -276,6 +349,9 @@ export function SessionSidebar({
             </div>
           ))}
         </div>
+
+        {/* Memory section */}
+        <MemorySection />
 
         {/* Footer: auth/status */}
         <div className="border-t border-border p-3">
