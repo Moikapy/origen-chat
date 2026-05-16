@@ -26,18 +26,24 @@ export const MODELS: Record<string, UIModel> = {
 
   // ── Premium: Claude ──────────────────────────────────────────────────
   "openrouter/anthropic/claude-sonnet-4":     { name: "Claude Sonnet 4",     description: "Anthropic Claude Sonnet 4",             free: false, pricing: { prompt: "$3.00", completion: "$15.00" } },
+  "openrouter/anthropic/claude-sonnet-4-5":   { name: "Claude Sonnet 4.5",   description: "Anthropic Claude Sonnet 4.5",           free: false, pricing: { prompt: "$3.00", completion: "$15.00" } },
   "openrouter/anthropic/claude-opus-4":       { name: "Claude Opus 4",       description: "Anthropic Claude Opus 4",               free: false, pricing: { prompt: "$15.00", completion: "$75.00" } },
+  "openrouter/anthropic/claude-opus-4-5":     { name: "Claude Opus 4.5",     description: "Anthropic Claude Opus 4.5",             free: false, pricing: { prompt: "$15.00", completion: "$75.00" } },
 
   // ── Premium: OpenAI ──────────────────────────────────────────────────
   "openrouter/openai/gpt-4o":                 { name: "GPT-4o",              description: "OpenAI GPT-4o",                         free: false, pricing: { prompt: "$2.50", completion: "$10.00" } },
   "openrouter/openai/gpt-4.1-mini":           { name: "GPT-4.1 Mini",        description: "OpenAI GPT-4.1 Mini",                   free: false, pricing: { prompt: "$0.40", completion: "$1.60" } },
   "openrouter/openai/gpt-4.1":                { name: "GPT-4.1",             description: "OpenAI GPT-4.1",                         free: false, pricing: { prompt: "$2.00", completion: "$8.00" } },
+  "openrouter/openai/gpt-5.2":                { name: "GPT-5.2",             description: "OpenAI GPT-5.2 (flagship)",              free: false, pricing: { prompt: "$2.50", completion: "$10.00" } },
+  "openrouter/openai/gpt-5.4-mini":            { name: "GPT-5.4 Mini",        description: "OpenAI GPT-5.4 Mini (fast)",             free: false, pricing: { prompt: "$0.15", completion: "$0.60" } },
+  "openrouter/openai/gpt-5.4":                { name: "GPT-5.4",             description: "OpenAI GPT-5.4 (balanced)",              free: false, pricing: { prompt: "$2.00", completion: "$8.00" } },
   "openrouter/openai/o3-mini":                { name: "O3 Mini",             description: "OpenAI reasoning (mini)",                free: false, pricing: { prompt: "$1.10", completion: "$4.40" } },
   "openrouter/openai/o4-mini":                { name: "O4 Mini",             description: "OpenAI reasoning (o4)",                  free: false, pricing: { prompt: "$1.10", completion: "$4.40" } },
 
   // ── Premium: Google ──────────────────────────────────────────────────
   "openrouter/google/gemini-2.5-pro":         { name: "Gemini 2.5 Pro",     description: "Google Gemini 2.5 Pro",                 free: false, pricing: { prompt: "$1.25", completion: "$10.00" } },
   "openrouter/google/gemini-2.5-flash":        { name: "Gemini 2.5 Flash",   description: "Google Gemini 2.5 Flash",               free: false, pricing: { prompt: "$0.15", completion: "$0.60" } },
+  "openrouter/google/gemini-3-pro":            { name: "Gemini 3 Pro",       description: "Google Gemini 3 Pro (thinking)",           free: false, pricing: { prompt: "$1.25", completion: "$5.00" } },
   "openrouter/google/gemini-3.1-flash-lite":   { name: "Gemini 3.1 Flash Lite", description: "Google Gemini 3.1 Flash",             free: false, pricing: { prompt: "$0.10", completion: "$0.40" } },
 
   // ── Premium: Meta ────────────────────────────────────────────────────
