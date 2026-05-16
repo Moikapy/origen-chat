@@ -3,7 +3,8 @@ import { buildAgentConfig, type ChatConfig } from "@/lib/config";
 import { isFreeModel as checkIsFreeModel, stripOpenrouterPrefix } from "@/lib/models";
 import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
 import { validateChatRequest, checkRateLimit, ensureRateLimitTable } from "@/lib/security";
-import { getMemoryFromD1, formatMemoryForPrompt } from "@/lib/memory-store";
+import { getMemoryFromD1 } from "@/lib/memory-store";
+import type { MemoryProvider, MemoryFact } from "@moikapy/origen";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
 export const maxDuration = 60;
@@ -104,20 +105,32 @@ async function handleChatRequest(request: Request): Promise<Response> {
   const { messages, model, wiki, ollamaBaseUrl, ollamaApiKey, systemPrompt: bodySystemPrompt } = body;
   const apiModel = stripOpenrouterPrefix(model);
 
-  // ── Load user memory for system prompt injection ──
-  let memorySuffix = "";
+  // ── Create MemoryProvider if user is authenticated ──
+  // The agent handles memory injection + tools.
+  // The app just provides the D1 storage backend.
+  let memory: MemoryProvider | undefined;
   if (d1 && userId) {
-    try {
-      const db = d1 as D1Database;
-      const facts = await getMemoryFromD1(db, userId);
-      memorySuffix = formatMemoryForPrompt(facts);
-    } catch { /* memory injection is best-effort */ }
+    const db = d1 as D1Database;
+    memory = {
+      getFacts: async () => {
+        try { return await getMemoryFromD1(db, userId); } catch { return []; }
+      },
+      saveFact: async (key, value) => {
+        await db.prepare("INSERT OR REPLACE INTO user_memory (user_id, key, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+          .bind(userId, key, value, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)).run();
+      },
+      deleteFact: async (key) => {
+        await db.prepare("DELETE FROM user_memory WHERE user_id = ? AND key = ?").bind(userId, key).run();
+      },
+      searchFacts: async (query) => {
+        try {
+          const results = await db.prepare("SELECT key, value, created_at, updated_at FROM user_memory WHERE user_id = ? AND (key LIKE ? OR value LIKE ?) ORDER BY updated_at DESC")
+            .bind(userId, `%${query}%`, `%${query}%`).all();
+          return (results.results as any[]).map((r) => ({ key: r.key, value: r.value, createdAt: r.created_at * 1000, updatedAt: r.updated_at * 1000 }));
+        } catch { return []; }
+      },
+    };
   }
-  const systemPromptWithMemory = bodySystemPrompt
-    ? memorySuffix
-      ? `${bodySystemPrompt}\n\n${memorySuffix}`
-      : bodySystemPrompt
-    : memorySuffix || undefined;
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
   let cookieApiKey: string | null = null;
@@ -173,7 +186,7 @@ async function handleChatRequest(request: Request): Promise<Response> {
   }
 
   const config = buildAgentConfig(
-    { model: apiModel, wiki, systemPrompt: systemPromptWithMemory, provider, apiKey, ollamaBaseUrl } as ChatConfig,
+    { model: apiModel, wiki, systemPrompt: bodySystemPrompt, provider, apiKey, ollamaBaseUrl, memory } as ChatConfig,
     async () => {
       // D1 binding from Cloudflare Workers env
       if (!d1) throw new Error("D1 database not available");
