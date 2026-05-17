@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth";
 import { useMemory } from "@/lib/use-memory";
 import { useState, useEffect } from "react";
+import { useOllama } from "@/lib/use-ollama";
 import Link from "next/link";
 
 export default function SettingsPage() {
@@ -13,14 +14,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keySuccess, setKeySuccess] = useState(false);
-  const [ollamaUrl, setOllamaUrl] = useState("");
+  const { url: ollamaUrl, connected: ollamaConnected, models: ollamaModels, saveUrl: saveOllamaUrl, disconnect: disconnectOllama } = useOllama();
+  const [ollamaInput, setOllamaInput] = useState("");
   const [ollamaSuccess, setOllamaSuccess] = useState(false);
 
-  // Load Ollama URL from localStorage on mount (client-only)
+  // Sync input with hook URL on mount
   useEffect(() => {
-    const saved = localStorage.getItem("ollama_url");
-    if (saved) setOllamaUrl(saved);
-  }, []);
+    if (ollamaUrl) setOllamaInput(ollamaUrl);
+  }, [ollamaUrl]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -58,12 +59,7 @@ export default function SettingsPage() {
   };
 
   const handleSaveOllama = () => {
-    const url = ollamaUrl.trim();
-    if (url) {
-      localStorage.setItem("ollama_url", url);
-    } else {
-      localStorage.removeItem("ollama_url");
-    }
+    saveOllamaUrl(ollamaInput);
     setOllamaSuccess(true);
     setTimeout(() => setOllamaSuccess(false), 2000);
   };
@@ -273,15 +269,15 @@ export default function SettingsPage() {
                   <p className="font-medium">Ollama</p>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      ollamaUrl ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
+                      ollamaConnected ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {ollamaUrl ? "Connected" : "Not configured"}
+                    {ollamaConnected ? "Connected" : "Not configured"}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {ollamaUrl
-                    ? `Running at ${ollamaUrl}`
+                  {ollamaConnected
+                    ? `${ollamaModels.length} model${ollamaModels.length !== 1 ? "s" : ""} available`
                     : "Run local models privately on your own machine."}
                 </p>
               </div>
@@ -290,8 +286,8 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <input
                 type="url"
-                value={ollamaUrl}
-                onChange={(e) => setOllamaUrl(e.target.value)}
+                value={ollamaInput}
+                onChange={(e) => setOllamaInput(e.target.value)}
                 placeholder="http://localhost:11434"
                 className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
               />
@@ -304,7 +300,29 @@ export default function SettingsPage() {
               {ollamaSuccess && (
                 <p className="text-xs text-green-400">Ollama URL saved!</p>
               )}
+
+              {ollamaConnected && (
+                <button
+                  onClick={disconnectOllama}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  Disconnect
+                </button>
+              )}
             </div>
+
+            {/* Show available Ollama models */}
+            {ollamaConnected && ollamaModels.length > 0 && (
+              <div className="space-y-1 mt-2">
+                <p className="text-xs font-medium text-foreground">Available models:</p>
+                {ollamaModels.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between bg-muted/30 rounded px-2 py-1 text-xs">
+                    <span className="font-mono">{m.name}</span>
+                    <span className="text-muted-foreground">{m.sizeLabel}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="bg-muted/30 rounded-lg px-4 py-3 text-xs text-muted-foreground">
               <p>Connect to a local or cloud Ollama instance to use models running on your own hardware. No API costs. Full privacy.</p>

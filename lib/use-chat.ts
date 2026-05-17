@@ -78,6 +78,12 @@ export function useChat(config: UseChatConfig) {
     const timeout = setTimeout(() => abort.abort(), 60_000);
 
     try {
+      // Route Ollama models directly to the browser — server can't reach localhost
+      if (config.model.startsWith("ollama/")) {
+        await sendToOllama(messages, config.model, sessionId, abort, config);
+        return;
+      }
+
       const auth = getAuthConfig();
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -236,5 +242,110 @@ export function getAuthConfig(): Record<string, string> {
     return {};
   } catch {
     return {};
+  }
+}
+
+/** Get Ollama base URL from localStorage */
+function getOllamaUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("ollama_url");
+  return stored ? stored.replace(/\/+$/, "") : null;
+}
+
+/** Send messages directly to a local Ollama instance from the browser.
+ *  Bypasses the server entirely — works with localhost Ollama.
+ */
+async function sendToOllama(
+  messages: ChatMessageInput[],
+  model: string,
+  sessionId: string,
+  abort: AbortController,
+  config: UseChatConfig,
+): Promise<void> {
+  const ollamaUrl = getOllamaUrl();
+  if (!ollamaUrl) {
+    await config.finalizeMessage({
+      content: "Ollama not configured. Set your Ollama URL in Settings.",
+      streaming: false,
+      isError: true,
+    }, sessionId);
+    return;
+  }
+
+  // Strip ollama/ prefix to get the model name Ollama expects
+  const ollamaModel = model.replace(/^ollama\//, "");
+
+  const res = await fetch(`${ollamaUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: ollamaModel,
+      messages: config.systemPrompt
+        ? [{ role: "system", content: config.systemPrompt }, ...messages]
+        : messages,
+      stream: true,
+    }),
+    signal: abort.signal,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    await config.finalizeMessage({
+      content: `Ollama error (${res.status}): ${errText}`,
+      streaming: false,
+      isError: true,
+    }, sessionId);
+    return;
+  }
+
+  // Parse Ollama's NDJSON streaming format
+  const reader = res.body?.getReader();
+  if (!reader) {
+    await config.finalizeMessage({ content: "No response body from Ollama", streaming: false, isError: true }, sessionId);
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let content = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n").filter((l) => l.trim());
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line) as {
+            message?: { content?: string };
+            done?: boolean;
+          };
+          if (data.message?.content) {
+            content += data.message.content;
+            await config.updateLastMessage({ content }, sessionId);
+          }
+          if (data.done) {
+            await config.finalizeMessage({ content, streaming: false }, sessionId);
+            return;
+          }
+        } catch {
+          // Skip malformed JSON lines
+        }
+      }
+    }
+    // Stream ended without done=true
+    await config.finalizeMessage({ content, streaming: false }, sessionId);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      await config.finalizeMessage({ streaming: false }, sessionId);
+    } else {
+      await config.finalizeMessage({
+        content: `Ollama stream error: ${err instanceof Error ? err.message : "Unknown"}`,
+        streaming: false,
+        isError: true,
+      }, sessionId);
+    }
   }
 }

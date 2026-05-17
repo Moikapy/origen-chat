@@ -4,6 +4,7 @@ import { useModels } from "@/lib/use-models";
 import { getProviderBadge, isRouterModel } from "@/lib/models";
 import { Skeleton } from "@/components/skeleton";
 import { useAuth } from "@/lib/auth";
+import { useOllama } from "@/lib/use-ollama";
 
 export function ModelSelector({
   value,
@@ -20,6 +21,7 @@ export function ModelSelector({
 }) {
   const { models, loading } = useModels();
   const { openrouterConnected } = useAuth();
+  const { models: ollamaModels, connected: ollamaConnected } = useOllama();
 
   const routerModels = models.filter((m) => isRouterModel(m.id));
   const freeModels = models.filter((m) => m.free && !isRouterModel(m.id));
@@ -91,6 +93,17 @@ export function ModelSelector({
               </option>
             );
           })}
+        </optgroup>
+      )}
+
+      {/* Ollama models — shows when connected to a local Ollama instance */}
+      {ollamaConnected && ollamaModels.length > 0 && (
+        <optgroup label="Ollama (local)">
+          {ollamaModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} ({m.sizeLabel})
+            </option>
+          ))}
         </optgroup>
       )}
     </select>

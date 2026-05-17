@@ -76,6 +76,8 @@ export function isRouterModel(model: string): boolean {
  * Only models explicitly marked tools:false are excluded.
  */
 export function modelSupportsTools(modelId: string): boolean {
+  // Ollama models: tools support varies, assume true for chat endpoint
+  if (modelId.startsWith("ollama/")) return true;
   const model = MODELS[modelId];
   if (!model) return true; // unknown model — assume tools work, let OpenRouter return errors
   return model.tools ?? true;
