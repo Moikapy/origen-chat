@@ -6,7 +6,9 @@
       "write(*.ts)",
       "edit(*.ts)",
       "bash(cd *)",
-      "bash(find *)"
+      "bash(find *)",
+      "ctx_search",
+      "write(*.md)"
     ],
     "deny": [],
     "ask": [],

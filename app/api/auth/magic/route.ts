@@ -16,17 +16,18 @@ export async function POST(request: Request) {
 
     const { env } = await getCtx();
 
+    console.log("[auth/magic] Sending magic link to:", email.trim().toLowerCase().replace(/(.{1}).+@/, "$1***@"));
     const result = await sendMagicLink(email.trim().toLowerCase(), {
       db: env.DB,
-      // Cloudflare Email Sending binding — free 3K emails/month
-      sendEmail: env.SEB,
-      // Fallback: Resend (set as wrangler secret)
+      // Use Resend directly — Cloudflare Email Sending requires domain verification
+      // and fails silently. Resend is reliable and already configured.
       resendApiKey: env.RESEND_API_KEY,
       fromEmail: env.FROM_EMAIL || process.env.FROM_EMAIL || "Origen Chat <no_reply@moikapy.dev>",
       appName: "Origen Chat",
       baseUrl: env.APP_URL || process.env.APP_URL || "https://origen-chat.moikapy.workers.dev",
       verifyPath: "/auth/verify",
     });
+    console.log("[auth/magic] Result:", JSON.stringify(result));
 
     return Response.json(result);
   } catch (err) {
