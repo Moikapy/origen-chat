@@ -330,7 +330,7 @@ function ChatPageInner() {
         )}
 
         {/* Input */}
-        <footer className="border-t border-border px-4 pb-5 pt-3 safe-bottom">
+        <footer className="border-t border-border px-4 pb-5 pt-3">
           <div className="mx-auto max-w-3xl">
             <div
               className="border border-border rounded-xl bg-card p-3 pt-2 focus-within:ring-2 focus-within:ring-ring"

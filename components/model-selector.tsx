@@ -209,7 +209,7 @@ export function ModelSelector({
 
       {/* Command palette popover */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-72 z-50 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-72 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-border">
             <input
@@ -226,7 +226,7 @@ export function ModelSelector({
           <div className="max-h-64 overflow-y-auto overscroll-contain">
             {Array.from(groups.entries()).map(([group, options]) => (
               <div key={group}>
-                <div className="sticky top-0 bg-popover/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-0 bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
                   {group}
                 </div>
                 {options.map((opt) => (
@@ -270,7 +270,7 @@ export function ModelSelector({
             {/* Ollama hint when not connected */}
             {showOllamaHint && (
               <div>
-                <div className="sticky top-0 bg-popover/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-0 bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
                   Ollama
                 </div>
                 <a
