@@ -12,9 +12,10 @@ import { useSessions } from "@/lib/use-sessions";
 import { useChat, getAuthConfig, type ChatMessageInput } from "@/lib/use-chat";
 import type { SessionMessage } from "@/lib/session-store";
 import { useAuth } from "@/lib/auth";
+import { ModelSelector } from "@/components/model-selector";
 
 function ChatPageInner() {
-  const { user } = useAuth();
+  const { user, openrouterConnected } = useAuth();
   const {
     sessions,
     activeId,
@@ -227,7 +228,6 @@ function ChatPageInner() {
         onDelete={remove}
         onRename={rename}
         onNew={handleNewChat}
-        onModelChange={setModel}
         onSystemPromptChange={(prompt) => {
           if (activeId) updateSystemPrompt(activeId, prompt);
         }}
@@ -332,6 +332,15 @@ function ChatPageInner() {
         {/* Input */}
         <footer className="border-t border-border px-4 py-3 safe-bottom">
           <div className="mx-auto max-w-3xl">
+            {/* Model selector row */}
+            <div className="flex items-center gap-2 mb-2">
+              <ModelSelector
+                value={model}
+                onChange={setModel}
+                freeOnly={!user && !openrouterConnected}
+                byok={openrouterConnected}
+              />
+            </div>
             <div
               className="flex gap-3 items-end border border-border rounded-lg bg-card p-3 focus-within:ring-2 focus-within:ring-ring"
               onKeyDown={(e) => {

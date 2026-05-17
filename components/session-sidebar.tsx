@@ -2,7 +2,6 @@
 
 import { useState, useRef } from "react";
 import type { Session } from "@/lib/session-store";
-import { ModelSelector } from "@/components/model-selector";
 import { SkeletonChatItem } from "@/components/skeleton";
 import { useOllama } from "@/lib/use-ollama";
 import { useAuth } from "@/lib/auth";
@@ -18,7 +17,6 @@ interface SessionSidebarProps {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onNew: () => void;
-  onModelChange: (model: string) => void;
   onSystemPromptChange: (prompt: string) => void;
   open: boolean;
   onClose: () => void;
@@ -239,7 +237,6 @@ export function SessionSidebar({
   onDelete,
   onRename,
   onNew,
-  onModelChange,
   systemPrompt,
   onSystemPromptChange,
   open,
@@ -292,30 +289,8 @@ export function SessionSidebar({
             </div>
           </div>
 
-          {/* Model selector */}
-          <ModelSelector
-            value={activeModel}
-            onChange={onModelChange}
-            freeOnly={!user && !openrouterConnected}
-            byok={openrouterConnected}
-          />
-          {!user && !openrouterConnected && (
-            <p className="text-[11px] text-muted-foreground mt-1.5 px-0.5">
-              <a href="/auth/login" className="text-primary hover:underline">Sign in</a> to use premium models
-            </p>
-          )}
-          {openrouterConnected && !user && (
-            <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
-              BYOK connected{openrouterInfo ? ` · $${openrouterInfo.balance.toFixed(2)}` : ''}
-            </p>
-          )}
-          {ollamaConnected && (
-            <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
-              Ollama · {ollamaModels.length} model{ollamaModels.length !== 1 ? "s" : ""}
-            </p>
-          )}
-
-          {/* System prompt */}
+        {/* Model selector - moved to input bar */}
+                    {/* System prompt */}
           <details className="mt-2">
             <summary className="text-[11px] text-muted-foreground/70 cursor-pointer hover:text-foreground transition-colors select-none">
               System prompt

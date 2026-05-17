@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { CHAINS } from "@/lib/wallet";
+// CHAINS imported dynamically to avoid SSR issues with siwe/viem
+const BASE_MAINNET = 8453;
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -51,18 +52,18 @@ export default function LoginPage() {
       const chainIdHex = await window.ethereum.request({ method: "eth_chainId" }) as string;
       const chainId = parseInt(chainIdHex, 16);
 
-      if (chainId !== CHAINS.BASE_MAINNET) {
+      if (chainId !== BASE_MAINNET) {
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: `0x${CHAINS.BASE_MAINNET.toString(16)}` }],
+            params: [{ chainId: `0x${BASE_MAINNET.toString(16)}` }],
           });
         } catch (switchErr: any) {
           if (switchErr.code === 4902) {
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
               params: [{
-                chainId: `0x${CHAINS.BASE_MAINNET.toString(16)}`,
+                chainId: `0x${BASE_MAINNET.toString(16)}`,
                 chainName: "Base",
                 nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
                 rpcUrls: ["https://mainnet.base.org"],
@@ -79,7 +80,7 @@ export default function LoginPage() {
       // Create and sign SIWE message
       const { createSiweMessage } = await import("@/lib/wallet");
       const domain = window.location.host;
-      const message = createSiweMessage({ domain, address: walletAddress, chainId: CHAINS.BASE_MAINNET, nonce });
+      const message = createSiweMessage({ domain, address: walletAddress, chainId: BASE_MAINNET, nonce });
       const signature = await window.ethereum.request({
         method: "personal_sign",
         params: [message, walletAddress],
