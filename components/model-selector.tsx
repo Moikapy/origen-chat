@@ -18,6 +18,25 @@ interface ModelOption {
   sizeLabel?: string;
 }
 
+/** Cost tier from pricing — returns $ indicators like T3 Chat */
+function getCostTier(opt: ModelOption): string {
+  if (opt.free) return "Free";
+  if (!opt.pricing?.promptPer1M) return "$·";
+  const cost = opt.pricing.promptPer1M;
+  if (cost < 0.5) return "$·";
+  if (cost < 5) return "$$·";
+  return "$$$·";
+}
+
+function getCostColor(opt: ModelOption): string {
+  if (opt.free) return "text-primary/80";
+  if (!opt.pricing?.promptPer1M) return "text-muted-foreground/60";
+  const cost = opt.pricing.promptPer1M;
+  if (cost < 0.5) return "text-emerald-400/80";
+  if (cost < 5) return "text-amber-400/80";
+  return "text-red-400/80";
+}
+
 function buildOptions(
   models: Awaited<ReturnType<typeof useModels>["models"]>,
   ollamaModels: OllamaModel[],
@@ -28,79 +47,48 @@ function buildOptions(
 ): ModelOption[] {
   const options: ModelOption[] = [];
 
-  // Routers
   const routers = models.filter((m) => isRouterModel(m.id));
   for (const m of routers) {
     options.push({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: getProviderBadge(m.id),
-      pricing: m.pricing,
-      free: m.free,
-      locked: false,
-      group: "Routers",
+      id: m.id, name: m.name, description: m.description,
+      provider: getProviderBadge(m.id), pricing: m.pricing, free: m.free,
+      locked: false, group: "Routers",
     });
   }
 
-  // Free models
   const freeModels = models.filter((m) => m.free && !isRouterModel(m.id));
   for (const m of freeModels) {
     options.push({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: getProviderBadge(m.id),
-      pricing: m.pricing,
-      free: m.free,
-      locked: false,
-      group: "Free",
+      id: m.id, name: m.name, description: m.description,
+      provider: getProviderBadge(m.id), pricing: m.pricing, free: m.free,
+      locked: false, group: "Free",
     });
   }
 
-  // Premium models
   const premiumModels = models.filter((m) => !m.free && !isRouterModel(m.id));
   const locked = !showPremium;
   for (const m of premiumModels) {
-    // Group by provider
     const slug = m.id.startsWith("openrouter/") ? m.id.slice("openrouter/".length) : m.id;
     const providerSlug = slug.split("/")[0];
     const providerNames: Record<string, string> = {
-      anthropic: "Claude",
-      openai: "OpenAI",
-      google: "Google",
-      deepseek: "DeepSeek",
-      "meta-llama": "Meta",
-      "x-ai": "xAI",
-      mistralai: "Mistral",
-      nvidia: "NVIDIA",
-      inclusionai: "inclusionAI",
+      anthropic: "Claude", openai: "OpenAI", google: "Google",
+      deepseek: "DeepSeek", "meta-llama": "Meta", "x-ai": "xAI",
+      mistralai: "Mistral", nvidia: "NVIDIA", inclusionai: "inclusionAI",
     };
-    const groupLabel = locked ? "Premium (locked)" : (providerNames[providerSlug] ?? "Premium");
+    const groupLabel = locked ? "Premium" : (providerNames[providerSlug] ?? "Premium");
     options.push({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: getProviderBadge(m.id),
-      pricing: m.pricing,
-      free: m.free,
-      locked,
-      group: groupLabel,
+      id: m.id, name: m.name, description: m.description,
+      provider: getProviderBadge(m.id), pricing: m.pricing, free: m.free,
+      locked, group: groupLabel,
     });
   }
 
-  // Ollama models
   if (ollamaConnected && ollamaModels.length > 0) {
     for (const m of ollamaModels) {
       options.push({
-        id: m.id,
-        name: m.name,
-        description: "Local Ollama model",
+        id: m.id, name: m.name, description: "Local Ollama model",
         provider: { text: "OLL", color: "bg-emerald-500/20 text-emerald-400" },
-        free: true,
-        locked: false,
-        group: "Ollama",
-        sizeLabel: m.sizeLabel,
+        free: true, locked: false, group: "Ollama", sizeLabel: m.sizeLabel,
       });
     }
   }
@@ -145,7 +133,6 @@ export function ModelSelector({
     );
   }, [allOptions, search]);
 
-  // Group filtered options
   const groups = useMemo(() => {
     const map = new Map<string, ModelOption[]>();
     for (const opt of filtered) {
@@ -156,7 +143,6 @@ export function ModelSelector({
     return map;
   }, [filtered]);
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -164,49 +150,66 @@ export function ModelSelector({
         setSearch("");
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setSearch("");
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
-  // Current model display
   const current = allOptions.find((m) => m.id === value);
-  const displayText = current?.name ?? value.split("/").pop() ?? "Select model";
-
-  // Always show Ollama section even when not connected (with setup hint)
-  const ollamaGroup = groups.get("Ollama");
+  const displayName = current?.name ?? value.split("/").pop() ?? "Select model";
   const showOllamaHint = !ollamaConnected && open;
 
   if (loading) {
-    return <div className="h-9 w-full rounded-md bg-secondary animate-pulse" />;
+    return <div className="h-7 w-28 rounded-md bg-secondary animate-pulse" />;
   }
 
   return (
-    <div ref={ref} className="relative w-full">
-      {/* Trigger button */}
+    <div ref={ref} className="relative">
+      {/* Compact trigger pill — T3 Chat style */}
       <button
         type="button"
+        role="combobox"
+        aria-expanded={open}
+        aria-label={`Select model. Current model: ${displayName}`}
         onClick={() => {
           setOpen(!open);
-          setTimeout(() => inputRef.current?.focus(), 50);
+          if (!open) setTimeout(() => inputRef.current?.focus(), 50);
         }}
-        className="flex items-center gap-2 w-full text-sm bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1.5 hover:bg-muted transition-colors"
+        className="chat-input-model-trigger relative flex min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground h-8"
       >
-        {current ? (
-          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${current.provider.color}`}>
+        {current && (
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${current.provider.color}`}>
             {current.provider.text}
           </span>
-        ) : (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/20 text-primary">FREE</span>
         )}
-        <span className="truncate flex-1 text-left">{displayText}</span>
-        <svg className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        {!current && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/20 text-primary shrink-0">
+            FREE
+          </span>
+        )}
+        <span className="truncate text-sm font-medium">{displayName}</span>
+        {current && (
+          <span className={`hidden sm:inline text-[10px] font-semibold tracking-tight shrink-0 ${getCostColor(current)}`}>
+            {getCostTier(current)}
+          </span>
+        )}
+        <svg className="size-3.5 shrink-0 text-muted-foreground/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
-      {/* Popover */}
+      {/* Command palette popover */}
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-72 z-50 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-border">
             <input
@@ -215,7 +218,7 @@ export function ModelSelector({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search models..."
-              className="w-full bg-input border border-border rounded-md px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 
@@ -223,7 +226,7 @@ export function ModelSelector({
           <div className="max-h-64 overflow-y-auto overscroll-contain">
             {Array.from(groups.entries()).map(([group, options]) => (
               <div key={group}>
-                <div className="sticky top-0 bg-muted/80 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-0 bg-popover/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
                   {group}
                 </div>
                 {options.map((opt) => (
@@ -238,26 +241,26 @@ export function ModelSelector({
                         setSearch("");
                       }
                     }}
-                    className={`flex items-center gap-2 w-full px-3 py-1.5 text-left text-sm hover:bg-muted/50 transition-colors ${
-                      opt.id === value ? "bg-primary/10" : ""
-                    } ${opt.locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`flex items-center gap-2 w-full px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors ${
+                      opt.id === value ? "bg-accent/50" : ""
+                    } ${opt.locked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                   >
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${opt.provider.color} shrink-0`}>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${opt.provider.color} shrink-0`}>
                       {opt.provider.text}
                     </span>
-                    <span className="truncate flex-1">{opt.name}</span>
-                    {opt.pricing && (
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {opt.pricing.prompt}
-                      </span>
-                    )}
+                    <span className="truncate flex-1 font-medium">{opt.name}</span>
+                    <span className={`text-[10px] font-semibold shrink-0 ${getCostColor(opt)}`}>
+                      {getCostTier(opt)}
+                    </span>
                     {opt.sizeLabel && (
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         {opt.sizeLabel}
                       </span>
                     )}
                     {opt.locked && (
-                      <span className="text-[10px] text-muted-foreground shrink-0">locked</span>
+                      <svg className="size-3 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
                     )}
                   </button>
                 ))}
@@ -267,17 +270,17 @@ export function ModelSelector({
             {/* Ollama hint when not connected */}
             {showOllamaHint && (
               <div>
-                <div className="sticky top-0 bg-muted/80 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-0 bg-popover/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
                   Ollama
                 </div>
                 <a
                   href="/settings"
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
                 >
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-500">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-500">
                     OLL
                   </span>
-                  <span className="flex-1">Connect in Settings</span>
+                  <span className="flex-1 font-medium">Connect in Settings</span>
                   <span className="text-[10px]">→</span>
                 </a>
               </div>

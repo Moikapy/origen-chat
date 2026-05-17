@@ -332,17 +332,8 @@ function ChatPageInner() {
         {/* Input */}
         <footer className="border-t border-border px-4 py-3 safe-bottom">
           <div className="mx-auto max-w-3xl">
-            {/* Model selector row */}
-            <div className="flex items-center gap-2 mb-2">
-              <ModelSelector
-                value={model}
-                onChange={setModel}
-                freeOnly={!user && !openrouterConnected}
-                byok={openrouterConnected}
-              />
-            </div>
             <div
-              className="flex gap-3 items-end border border-border rounded-lg bg-card p-3 focus-within:ring-2 focus-within:ring-ring"
+              className="flex gap-2 items-center border border-border rounded-lg bg-card p-3 focus-within:ring-2 focus-within:ring-ring"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -350,6 +341,12 @@ function ChatPageInner() {
                 }
               }}
             >
+              <ModelSelector
+                value={model}
+                onChange={setModel}
+                freeOnly={!user && !openrouterConnected}
+                byok={openrouterConnected}
+              />
               <div className="flex-1 min-h-[2rem]">
                 <EditorContent editor={editor} />
               </div>
