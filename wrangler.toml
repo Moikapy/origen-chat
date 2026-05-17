@@ -22,3 +22,5 @@ name = "SEB"
 [vars]
 APP_URL = "https://origen-chat.moikapy.workers.dev"
 FROM_EMAIL = "Origen Chat <no_reply@moikapy.dev>"
+TREASURY_WALLET = "0x1fC5F441de0800d7e92f8d111C7e2f2AFe038c8C"
+BASE_RPC_URL = "https://mainnet.base.org"
