@@ -326,6 +326,7 @@ export default function SettingsPage() {
 
             <div className="bg-muted/30 rounded-lg px-4 py-3 text-xs text-muted-foreground">
               <p>Connect to a local or cloud Ollama instance to use models running on your own hardware. No API costs. Full privacy.</p>
+              <p className="mt-1.5">If models don't appear, set <code className="bg-muted px-1 py-0.5 rounded text-[10px]">OLLAMA_ORIGINS=*</code> in your Ollama environment to allow browser access.</p>
             </div>
           </div>
         </section>

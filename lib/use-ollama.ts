@@ -42,10 +42,30 @@ export function useOllama() {
           }
         })
         .catch(() => {
-          // Ollama not running — that's fine
+          // Ollama not running or CORS blocked — that's fine, user can configure in Settings
         });
     }
   }, []);
+
+  /** Test connection and return detailed status */
+  const testConnection = useCallback(async (testUrl?: string): Promise<{ ok: boolean; error?: string }> => {
+    const baseUrl = (testUrl || url || "").replace(/\/+$/, "");
+    if (!baseUrl) return { ok: false, error: "No URL configured" };
+
+    try {
+      const res = await fetch(`${baseUrl}/api/tags`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) return { ok: true };
+      return { ok: false, error: `HTTP ${res.status}` };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        return { ok: false, error: "CORS blocked. Set OLLAMA_ORIGINS=* in your Ollama environment." };
+      }
+      return { ok: false, error: msg };
+    }
+  }, [url]);
 
   // Fetch models when URL is set
   const refreshModels = useCallback(async (ollamaUrl?: string) => {
@@ -125,6 +145,7 @@ export function useOllama() {
     saveUrl,
     disconnect,
     refreshModels,
+    testConnection,
   };
 }
 
