@@ -291,6 +291,11 @@ export function isActive(sub: UserSubscription): boolean {
   return sub.currentPeriodEnd > Math.floor(Date.now() / 1000);
 }
 
+/** Check if a model is a router (variable cost, resolved at runtime) */
+export function isRouterModel(slug: string): boolean {
+  return slug === "openrouter/free" || slug === "openrouter/auto" || slug === "openrouter/pareto-code";
+}
+
 /** Get all model costs */
 export async function getModelCosts(db: D1Database): Promise<ModelCost[]> {
   const results = await db.prepare("SELECT * FROM model_costs ORDER BY credits_per_message ASC").all();

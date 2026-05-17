@@ -14,6 +14,10 @@ export interface UIModel {
 }
 
 export const MODELS: Record<string, UIModel> = {
+  // ── Routers (OpenRouter built-in)
+  "openrouter/auto":                            { name: "Auto Router",            description: "Smart routing — picks best model for your prompt (NotDiamond)", free: false, pricing: { prompt: "Variable", completion: "Variable" } },
+  "openrouter/pareto-code":                    { name: "Pareto Code",            description: "Cost-efficient coding router — cheapest model that meets your bar", free: false, pricing: { prompt: "Variable", completion: "Variable" } },
+
   // ── Free (supports tools) ──────────────────────────────────────────
   "openrouter/free":                          { name: "Free",                description: "Auto-selects best free model",        free: true },
   "openrouter/deepseek/deepseek-v4-flash:free":  { name: "DeepSeek V4 Flash",  description: "DeepSeek V4 Flash (fast, tools)",    free: true },
@@ -62,6 +66,11 @@ export function isFreeModel(model: string): boolean {
   return model === "openrouter/free" || model.endsWith(":free") || model.startsWith("openrouter/free");
 }
 
+/** Check if a model is a router (not a concrete model — routes to another model at runtime). */
+export function isRouterModel(model: string): boolean {
+  return model === "openrouter/auto" || model === "openrouter/pareto-code" || model === "openrouter/free";
+}
+
 /** Check if a model supports tool/function calling.
  * Defaults to true — most OpenRouter models support tools now.
  * Only models explicitly marked tools:false are excluded.
@@ -74,25 +83,34 @@ export function modelSupportsTools(modelId: string): boolean {
 
 /** Strip "openrouter/" prefix for API calls.
  * UI IDs like "openrouter/deepseek/deepseek-v4-flash:free" become "deepseek/deepseek-v4-flash:free".
- * But "openrouter/free" stays as-is since @moikapy/origen knows it directly.
+ * But router model IDs ("openrouter/free", "openrouter/auto", "openrouter/pareto-code") stay as-is
+ * since the OpenRouter API knows them directly.
  */
 export function stripOpenrouterPrefix(model: string): string {
-  if (model === "openrouter/free") return model;
+  if (model === "openrouter/free" || model === "openrouter/auto" || model === "openrouter/pareto-code") return model;
   if (model.startsWith("openrouter/")) return model.slice("openrouter/".length);
   return model;
 }
 
 export const MODEL_GROUPS = [
   {
+    label: "Routers",
+    models: Object.entries(MODELS)
+      .filter(([id]) => isRouterModel(id))
+      .map(([id, m]) => ({ id, ...m })),
+  },
+  {
     label: "Free",
     models: Object.entries(MODELS)
       .filter(([, m]) => m.free)
+      .filter(([id]) => !isRouterModel(id))
       .map(([id, m]) => ({ id, ...m })),
   },
   {
     label: "Premium",
     models: Object.entries(MODELS)
       .filter(([, m]) => !m.free)
+      .filter(([id]) => !isRouterModel(id))
       .map(([id, m]) => ({ id, ...m })),
   },
 ];
@@ -115,6 +133,14 @@ export function getProviderBadge(modelId: string): { text: string; color: string
     nvidia: { text: "NV", color: "bg-lime-500/20 text-lime-400" },
     inclusionai: { text: "INC", color: "bg-pink-500/20 text-pink-400" },
   };
+
+  // Special case: routers
+  if (modelId === "openrouter/auto" || slug === "auto") {
+    return { text: "AUTO", color: "bg-violet-500/20 text-violet-400" };
+  }
+  if (modelId === "openrouter/pareto-code") {
+    return { text: "PARETO", color: "bg-amber-500/20 text-amber-400" };
+  }
 
   // Special case: free router
   if (modelId === "openrouter/free" || slug === "free") {
