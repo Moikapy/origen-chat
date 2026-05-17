@@ -64,13 +64,13 @@ export async function POST(request: Request) {
 /** DELETE /auth/exchange — Disconnect OpenRouter (clear cookie) */
 export async function DELETE() {
   try {
-    // Clear the encrypted API key cookie directly
+    // Clear both cookies (remove Secure for dev compat)
     const headers = new Headers();
-    headers.set("Set-Cookie", "or_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
-    headers.set("Set-Cookie", "or_ollama_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
+    headers.append("Set-Cookie", "or_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+    headers.append("Set-Cookie", "or_ollama_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
     return new Response(JSON.stringify({ ok: true, disconnected: true }), {
       status: 200,
-      headers: { ...Object.fromEntries(headers), "Content-Type": "application/json" },
+      headers,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Disconnect failed";

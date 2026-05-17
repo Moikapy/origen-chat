@@ -4,7 +4,7 @@
  * Combines the magic-link auth status with the OpenRouter BYOK status
  * so the client knows both: who the user is AND whether they have a key.
  */
-import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
+import { decryptApiKey } from "@moikapy/openrouter-auth/crypto";
 
 async function getEnv() {
   try {
@@ -19,10 +19,15 @@ async function getEnv() {
   }
 }
 
-/** Get session ID from magic_session cookie */
-function getSessionId(request: Request): string | null {
+const OR_COOKIE = "or_session";
+const MAGIC_COOKIE = "magic_session";
+
+/** Parse a specific cookie from the Cookie header */
+function getCookieValue(request: Request, name: string): string | null {
   const cookies = request.headers.get("cookie") ?? "";
-  const match = cookies.match(/magic_session=([^;]+)/);
+  // Match cookie name=value (value may contain base64url chars: A-Za-z0-9_-)
+  const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
+  const match = cookies.match(regex);
   return match?.[1] ?? null;
 }
 
@@ -30,7 +35,7 @@ export async function GET(request: Request) {
   try {
     const env = await getEnv();
     const encryptKey = env.OPENROUTER_ENCRYPT_KEY;
-    const sessionId = getSessionId(request);
+    const sessionId = getCookieValue(request, MAGIC_COOKIE);
 
     // Check magic-link auth
     let user: { id: string; email: string } | null = null;
@@ -49,19 +54,19 @@ export async function GET(request: Request) {
       }
     }
 
-    // Check OpenRouter connection
+    // Check OpenRouter connection — decrypt the cookie directly
     let openrouterConnected = false;
-    if (encryptKey) {
+    const orCookie = getCookieValue(request, OR_COOKIE);
+    if (orCookie && encryptKey) {
       try {
-        const apiKey = await getApiKeyFromCookie({
-          encryptKey,
+        const result = await decryptApiKey(orCookie, encryptKey, {
           previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS
             ? [env.OPENROUTER_ENCRYPT_KEY_PREVIOUS]
             : undefined,
         });
-        openrouterConnected = !!apiKey;
+        openrouterConnected = !!result.apiKey;
       } catch {
-        // No valid cookie — not connected
+        // Cookie expired, invalid, or wrong encryption key — not connected
       }
     }
 

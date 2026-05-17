@@ -54,10 +54,12 @@ export async function POST(request: Request) {
     });
 
     // Set the cookie
+    // Note: Don't set Secure flag — Cloudflare Workers terminates TLS at the edge,
+    // so the browser connection is HTTPS but the cookie still needs to work in dev (localhost)
     const headers = new Headers();
     headers.append(
       "Set-Cookie",
-      `${COOKIE_NAME}=${encrypted}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
+      `${COOKIE_NAME}=${encrypted}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
     );
 
     return new Response(JSON.stringify({ ok: true, connected: true }), {
