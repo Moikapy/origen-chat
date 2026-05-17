@@ -18,9 +18,10 @@ export interface TokenLaunchParams {
 interface TokenLaunchFormProps {
   onSubmit: (params: TokenLaunchParams) => void;
   loading?: boolean;
+  onImageChange?: (file: File | null) => void;
 }
 
-export function TokenLaunchForm({ onSubmit, loading }: TokenLaunchFormProps) {
+export function TokenLaunchForm({ onSubmit, loading, onImageChange }: TokenLaunchFormProps) {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
@@ -38,6 +39,7 @@ export function TokenLaunchForm({ onSubmit, loading }: TokenLaunchFormProps) {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
+      onImageChange?.(file);
       const reader = new FileReader();
       reader.onload = (ev) => setImagePreview(ev.target?.result as string);
       reader.readAsDataURL(file);

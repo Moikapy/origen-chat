@@ -24,11 +24,26 @@ export function useOllama() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Load URL from localStorage on mount
+  // Auto-detect: if no URL saved, try localhost:11434 on mount
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       setUrlInternal(saved);
+    } else {
+      // Auto-probe localhost:11434 — if Ollama is running, auto-connect
+      fetch("http://localhost:11434/api/tags", {
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((res) => {
+          if (res.ok) {
+            setUrlInternal("http://localhost:11434");
+            localStorage.setItem(STORAGE_KEY, "http://localhost:11434");
+            localStorage.setItem("origen_ollama_config", JSON.stringify({ baseUrl: "http://localhost:11434", apiKey: "" }));
+          }
+        })
+        .catch(() => {
+          // Ollama not running — that's fine
+        });
     }
   }, []);
 

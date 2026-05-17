@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import type { Session } from "@/lib/session-store";
 import { ModelSelector } from "@/components/model-selector";
 import { SkeletonChatItem } from "@/components/skeleton";
+import { useOllama } from "@/lib/use-ollama";
 import { useAuth } from "@/lib/auth";
 import { useMemory } from "@/lib/use-memory";
 
@@ -247,6 +248,7 @@ export function SessionSidebar({
   loading,
 }: SessionSidebarProps) {
   const { user, openrouterConnected, openrouterInfo, connectOpenRouter, disconnectOpenRouter } = useAuth();
+  const { connected: ollamaConnected, models: ollamaModels } = useOllama();
   const grouped = groupSessions(sessions);
 
   return (
@@ -305,6 +307,11 @@ export function SessionSidebar({
           {openrouterConnected && !user && (
             <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
               BYOK connected{openrouterInfo ? ` · $${openrouterInfo.balance.toFixed(2)}` : ''}
+            </p>
+          )}
+          {ollamaConnected && (
+            <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
+              Ollama · {ollamaModels.length} model{ollamaModels.length !== 1 ? "s" : ""}
             </p>
           )}
 
