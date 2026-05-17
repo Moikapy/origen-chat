@@ -9,6 +9,10 @@ export default function SettingsPage() {
   const { user, loading, openrouterConnected, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
   const { facts } = useMemory();
   const [disconnecting, setDisconnecting] = useState(false);
+  const [manualKey, setManualKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [keySuccess, setKeySuccess] = useState(false);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -16,6 +20,32 @@ export default function SettingsPage() {
       await disconnectOpenRouter();
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const handleManualKey = async () => {
+    if (!manualKey.trim()) return;
+    setSaving(true);
+    setKeyError(null);
+    setKeySuccess(false);
+    try {
+      const res = await fetch("/api/auth/set-api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: manualKey.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        throw new Error(data.error || "Failed to save key");
+      }
+      setManualKey("");
+      setKeySuccess(true);
+      // Refresh auth state
+      window.location.reload();
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : "Failed to save key");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -124,12 +154,53 @@ export default function SettingsPage() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={connectOpenRouter}
-                className="w-full text-sm px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-medium"
-              >
-                Connect OpenRouter
-              </button>
+              <div className="space-y-3">
+                {/* Method 1: OAuth PKCE */}
+                <button
+                  onClick={connectOpenRouter}
+                  className="w-full text-sm px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-medium"
+                >
+                  Connect with OpenRouter (OAuth)
+                </button>
+
+                {/* Method 2: Manual API key */}
+                <details className="group">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                    Or paste your API key manually
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    <input
+                      type="password"
+                      value={manualKey}
+                      onChange={(e) => { setManualKey(e.target.value); setKeyError(null); setKeySuccess(false); }}
+                      placeholder="sk-or-v1-..."
+                      className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                      disabled={saving}
+                    />
+                    <button
+                      onClick={handleManualKey}
+                      disabled={saving || !manualKey.trim()}
+                      className="w-full text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      {saving ? "Encrypting..." : "Save API Key"}
+                    </button>
+                    {keyError && (
+                      <p className="text-xs text-destructive">{keyError}</p>
+                    )}
+                    {keySuccess && (
+                      <p className="text-xs text-green-400">Key saved! Reloading...</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Your key is encrypted (AES-256-GCM) before storage.
+                      We never see or store your key in plaintext.
+                      Get your key at{" "}
+                      <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        openrouter.ai/settings/keys
+                      </a>
+                    </p>
+                  </div>
+                </details>
+              </div>
             )}
 
             {/* BYOK explanation */}
