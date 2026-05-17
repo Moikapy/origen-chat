@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@0xkobold/warm-editorial": "file:../warm-editorial",
+    "@flaunch/sdk": "^0.9.20",
     "@moikapy/cf-helpers": "file:../cf-helpers",
     "@moikapy/magic-link": "^0.1.2",
     "@moikapy/openrouter-auth": "^0.1.0",
@@ -37,7 +38,8 @@
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
-    "siwe": "^3.0.0"
+    "siwe": "^3.0.0",
+    "viem": "^2.49.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260514.1",

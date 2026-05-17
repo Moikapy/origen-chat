@@ -265,62 +265,22 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Wallet & Billing */}
+        {/* Pro Subscription — Coming Soon */}
         <section className="mb-10">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
-            Wallet & Billing
+            Pro
           </h2>
-          <div className="bg-card border border-border rounded-lg p-6 space-y-6">
-            {/* Wallet Section */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Crypto Wallet</p>
-                <p className="text-sm text-muted-foreground">
-                  Connect MetaMask to pay with USDC on Base or launch tokens
-                </p>
-              </div>
-              <Link
-                href="/settings/wallet"
-                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Manage Wallet
-              </Link>
-            </div>
-
-            <div className="border-t border-border" />
-
-            {/* Pro Section */}
+          <div className="bg-card border border-border rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Origen Pro</p>
                 <p className="text-sm text-muted-foreground">
-                  $5/month — 2,000 credits, premium models, unlimited memory
+                  $12/month — unlimited memory, personas, search, image gen
                 </p>
               </div>
-              <Link
-                href="/settings/billing"
-                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Subscribe
-              </Link>
-            </div>
-
-            <div className="border-t border-border" />
-
-            {/* Token Section */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Launch a Token</p>
-                <p className="text-sm text-muted-foreground">
-                  Create your own token on Base — earn ETH from trading fees
-                </p>
-              </div>
-              <Link
-                href="/token"
-                className="text-sm px-4 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors"
-              >
-                Launch
-              </Link>
+              <span className="text-sm px-4 py-1.5 rounded-lg border border-border text-muted-foreground">
+                Coming soon
+              </span>
             </div>
           </div>
         </section>

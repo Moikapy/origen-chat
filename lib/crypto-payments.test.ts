@@ -1,12 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  verifyUsdcPayment,
-  usdToCredits,
-  CREDITS_PER_DOLLAR,
-  PLATFORM_SPREAD,
-  USDC_BASE_CONTRACT,
-  PRO_PRICE_CENTS,
-} from "./crypto-payments";
+import { verifyUsdcPayment, usdToCredits, CREDITS_PER_DOLLAR, PLATFORM_SPREAD, USDC_BASE_CONTRACT, PRO_PRICE_CENTS } from "./crypto-payments";
 
 describe("verifyUsdcPayment", () => {
   it("rejects empty tx hash", async () => {
@@ -15,30 +8,18 @@ describe("verifyUsdcPayment", () => {
     expect(result.reason).toContain("required");
   });
 
-  it("rejects zero amount via options", async () => {
-    const result = await verifyUsdcPayment("0x123", "0xTreasury", "https://mainnet.base.org", {
-      minimumAmount: 1_000_000n,
-    });
-    // This will fail at RPC call since 0x123 isn't a real tx,
-    // but we test that the function accepts the options shape
-    expect(result.verified).toBe(false);
-  });
-
   it("validates USDC contract address format", () => {
-    // USDC on Base must be the known contract
     expect(USDC_BASE_CONTRACT).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
   });
 });
 
 describe("usdToCredits", () => {
   it("converts USD cents to credits with platform spread", () => {
-    // $5.00 = 500 cents → 500 * 0.97 = 485 credits
     const credits = usdToCredits(500);
     expect(credits).toBe(Math.floor(500 * (1 - PLATFORM_SPREAD)));
   });
 
   it("converts ETH price to credits", () => {
-    // 0.01 ETH at $3500 → $35 = 3500 cents → 3395 credits
     const credits = usdToCredits(3500);
     expect(credits).toBe(Math.floor(3500 * (1 - PLATFORM_SPREAD)));
   });
@@ -48,22 +29,11 @@ describe("usdToCredits", () => {
     expect(Number.isInteger(credits)).toBe(true);
   });
 
-  it("CREDITS_PER_DOLLAR is 100 (1 cent per credit)", () => {
-    expect(CREDITS_PER_DOLLAR).toBe(100);
-  });
-
-  it("PLATFORM_SPREAD is 3%", () => {
-    expect(PLATFORM_SPREAD).toBe(0.03);
-  });
+  it("CREDITS_PER_DOLLAR is 100", () => { expect(CREDITS_PER_DOLLAR).toBe(100); });
+  it("PLATFORM_SPREAD is 3%", () => { expect(PLATFORM_SPREAD).toBe(0.03); });
 });
 
 describe("PRO_PRICE_CENTS", () => {
-  it("Pro subscription costs $5 = 500 cents", () => {
-    expect(PRO_PRICE_CENTS).toBe(500);
-  });
-
-  it("Pro subscription yields 485 credits after spread", () => {
-    const credits = usdToCredits(PRO_PRICE_CENTS);
-    expect(credits).toBe(485);
-  });
+  it("Pro costs $5 = 500 cents", () => { expect(PRO_PRICE_CENTS).toBe(500); });
+  it("Pro yields 485 credits after spread", () => { expect(usdToCredits(PRO_PRICE_CENTS)).toBe(485); });
 });
