@@ -237,7 +237,7 @@ export default function TokenPage() {
 
         {/* Revenue */}
         <section className="mb-10">
-          <RevenueDashboard walletConnected={walletConnected} />
+          <RevenueDashboard walletConnected={walletConnected} walletAddress={walletAddress || undefined} />
         </section>
 
         {/* Launch */}
