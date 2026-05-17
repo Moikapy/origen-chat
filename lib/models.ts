@@ -23,9 +23,9 @@ export const MODELS: Record<string, UIModel> = {
   "openrouter/deepseek/deepseek-v4-flash:free":  { name: "DeepSeek V4 Flash",  description: "DeepSeek V4 Flash (fast, tools)",    free: true },
   "openrouter/deepseek/deepseek-chat-v3-0324:free":  { name: "DeepSeek V3",        description: "DeepSeek Chat V3",                    free: true },
   "openrouter/deepseek/deepseek-r1:free":     { name: "DeepSeek R1",         description: "DeepSeek reasoning model",              free: true, tools: false },
-  "openrouter/google/gemini-2.0-flash-exp:free":  { name: "Gemini 2.0 Flash",   description: "Google Gemini Flash",                  free: true },
-  "openrouter/nvidia/nemotron-3-super:free":   { name: "Nemotron 3 Super",    description: "NVIDIA 120B MoE (free)",                free: true },
-  "openrouter/inclusionai/ring-2.6-1t:free":  { name: "Ring 2.6",            description: "inclusionAI 1T-parameter (free)",        free: true },
+  "openrouter/google/gemini-2.0-flash-001":   { name: "Gemini 2.0 Flash",   description: "Google Gemini 2.0 Flash (fast, cheap)",              free: false, pricing: { prompt: "$0.00010", completion: "$0.00040" } },
+  "openrouter/nvidia/nemotron-3-super-120b-a12b:free":   { name: "Nemotron 3 Super",    description: "NVIDIA 120B MoE (free)",                free: true },
+  "openrouter/inclusionai/ring-2.6-1t":         { name: "Ring 2.6",            description: "inclusionAI 1T-parameter thinking model",       free: false, pricing: { prompt: "$0.10", completion: "$0.40" } },
   "openrouter/meta-llama/llama-3.3-70b-instruct:free": { name: "Llama 3.3 70B", description: "Meta Llama 3.3 70B (free)",            free: true },
 
   // ── Premium: Claude ──────────────────────────────────────────────────
