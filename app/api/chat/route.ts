@@ -6,7 +6,8 @@ import { validateChatRequest, checkRateLimit, ensureRateLimitTable } from "@/lib
 import { requireOrigin } from "@/lib/origin-guard";
 import { sanitizeError } from "@/lib/sanitize-error";
 import { getMemoryFromD1 } from "@/lib/memory-store";
-import type { MemoryProvider, MemoryFact } from "@moikapy/origen";
+import type { MemoryProvider, MemoryFact, PeerProvider } from "@moikapy/origen";
+import { CloudPeerProvider, PEERS_MIGRATION } from "@moikapy/origen/peers/cloud";
 import { consolidateConversation, createD1MemoryProvider } from "@/lib/consolidate";
 
 // No edge runtime — Cloudflare Workers with nodejs_compat handles Node.js APIs
@@ -120,6 +121,13 @@ async function handleChatRequest(request: Request): Promise<Response> {
     memory = createD1MemoryProvider(d1 as D1Database, userId);
   }
 
+  // ── Create PeerProvider + run migration if authenticated ──
+  let peerProvider: PeerProvider | undefined;
+  if (d1 && userId) {
+    try { await d1.prepare(PEERS_MIGRATION).run(); } catch { /* migration already exists */ }
+    peerProvider = new CloudPeerProvider(async () => d1 as any);
+  }
+
   // 1. Try user's own key (OpenRouter OAuth cookie)
   let cookieApiKey: string | null = null;
   try {
@@ -174,7 +182,7 @@ async function handleChatRequest(request: Request): Promise<Response> {
   }
 
   const config = buildAgentConfig(
-    { model: apiModel, wiki, systemPrompt: bodySystemPrompt, provider, apiKey, ollamaBaseUrl, memory } as ChatConfig,
+    { model: apiModel, wiki, systemPrompt: bodySystemPrompt, provider, apiKey, ollamaBaseUrl, memory, peerProvider, userId: userId ?? undefined } as ChatConfig,
     async () => {
       // D1 binding from Cloudflare Workers env
       if (!d1) throw new Error("D1 database not available");

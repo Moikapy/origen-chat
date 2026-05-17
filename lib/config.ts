@@ -1,4 +1,4 @@
-import { type ModelId, type AgentConfig, type D1Like, type MemoryProvider, type MemoryFact } from "@moikapy/origen";
+import { type ModelId, type AgentConfig, type D1Like, type MemoryProvider, type MemoryFact, type PeerProvider, type PeersConfig } from "@moikapy/origen";
 import { modelSupportsTools } from "./models";
 import { createTools } from "./tools";
 
@@ -10,6 +10,8 @@ export interface ChatConfig {
   apiKey: string;
   ollamaBaseUrl?: string;
   memory?: MemoryProvider;
+  peerProvider?: PeerProvider;
+  userId?: string;
 }
 
 /** Check if a model is a free model on OpenRouter. */
@@ -48,6 +50,13 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
     // to avoid rate limiting. Premium users get the full wiki experience.
     wiki: config.wiki && supportsTools && !isFree ? { type: "cloud" as const } : undefined,
     memory: config.memory,
+    peers: config.peerProvider ? {
+      peerProvider: config.peerProvider,
+      reasoningModel: "openrouter/google/gemini-2.0-flash-001" as ModelId,
+      peerIds: config.userId ? [`user:${config.userId}`] : ["user:default"],
+      selfPeerId: "agent:origen-chat",
+      autoBuild: true,
+    } satisfies PeersConfig : undefined,
     maxSteps,
     // Note: response-healing plugin is now injected by default in @moikapy/origen
     // for all OpenRouter models. No need to specify onPayload here unless
