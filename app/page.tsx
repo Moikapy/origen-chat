@@ -87,7 +87,7 @@ export default function LandingPage() {
                   className="rounded-lg border border-primary/30 bg-primary/10 text-primary px-3 py-2.5 text-sm"
                 >
                   <div className="font-medium">{m.name}</div>
-                  <div className="text-xs mt-0.5 opacity-75">✓ Free</div>
+                  <div className="text-xs mt-0.5 opacity-75">Free</div>
                 </div>
               ))}
             </div>
@@ -154,23 +154,23 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-3 gap-8">
             {[
               {
-                icon: "🔒",
+                badge: "PRIVACY",
                 title: "Private by default",
-                desc: "No data selling. No tracking. Your conversations stay yours. Open‑source agent core.",
+                desc: "No data selling. No ad tracking. Your conversations go directly to the model provider — we never see them on BYOK.",
               },
               {
-                icon: "⚡",
-                title: "Zero config for free",
-                desc: "Start chatting instantly with free models. No sign-up required. Add your own keys for more.",
+                badge: "FREE",
+                title: "Free models, zero config",
+                desc: "Start chatting instantly with free models — no account or API key needed. Add your own OpenRouter key to unlock premium models.",
               },
               {
-                icon: "🔄",
+                badge: "PORTABLE",
                 title: "No lock-in",
-                desc: "Bring your own OpenRouter or Ollama keys. Swap providers anytime. Your data, your choice.",
+                desc: "Bring your own OpenRouter or Ollama keys. Swap providers anytime. BYOK means you pay the provider directly — we never charge for the pipe.",
               },
             ].map((f) => (
               <div key={f.title} className="space-y-3">
-                <div className="text-2xl">{f.icon}</div>
+                <span className="text-[10px] font-mono font-semibold tracking-widest text-primary">{f.badge}</span>
                 <h3 className="font-semibold">{f.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>

@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/lib/auth";
 import { useMemory } from "@/lib/use-memory";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function SettingsPage() {
@@ -13,6 +13,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keySuccess, setKeySuccess] = useState(false);
+  const [ollamaUrl, setOllamaUrl] = useState("");
+  const [ollamaSuccess, setOllamaSuccess] = useState(false);
+
+  // Load Ollama URL from localStorage on mount (client-only)
+  useEffect(() => {
+    const saved = localStorage.getItem("ollama_url");
+    if (saved) setOllamaUrl(saved);
+  }, []);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -47,6 +55,17 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveOllama = () => {
+    const url = ollamaUrl.trim();
+    if (url) {
+      localStorage.setItem("ollama_url", url);
+    } else {
+      localStorage.removeItem("ollama_url");
+    }
+    setOllamaSuccess(true);
+    setTimeout(() => setOllamaSuccess(false), 2000);
   };
 
   if (loading) {
@@ -241,6 +260,54 @@ export default function SettingsPage() {
                 We never see or store your API key in plaintext.
                 You can disconnect at any time.
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Ollama Section */}
+        <section className="mb-10">
+          <div className="bg-card border border-border rounded-lg p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">Ollama</p>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      ollamaUrl ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {ollamaUrl ? "Connected" : "Not configured"}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {ollamaUrl
+                    ? `Running at ${ollamaUrl}`
+                    : "Run local models privately on your own machine."}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="url"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                placeholder="http://localhost:11434"
+                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+              />
+              <button
+                onClick={handleSaveOllama}
+                className="w-full text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors"
+              >
+                Save Ollama URL
+              </button>
+              {ollamaSuccess && (
+                <p className="text-xs text-green-400">Ollama URL saved!</p>
+              )}
+            </div>
+
+            <div className="bg-muted/30 rounded-lg px-4 py-3 text-xs text-muted-foreground">
+              <p>Connect to a local or cloud Ollama instance to use models running on your own hardware. No API costs. Full privacy.</p>
             </div>
           </div>
         </section>
