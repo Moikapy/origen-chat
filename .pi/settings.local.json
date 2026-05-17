@@ -9,7 +9,9 @@
       "bash(find *)",
       "ctx_search",
       "write(*.md)",
-      "pi_web_search"
+      "pi_web_search",
+      "edit(*.md)",
+      "bash(ls *)"
     ],
     "deny": [],
     "ask": [],
