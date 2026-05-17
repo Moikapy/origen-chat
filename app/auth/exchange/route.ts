@@ -8,6 +8,8 @@
  * Uses @moikapy/openrouter-auth for encryption and PKCE verification.
  */
 import { exchangeCodeAndSetCookie } from "@moikapy/openrouter-auth/next";
+import { requireOrigin, buildCookieString } from "@/lib/origin-guard";
+import { sanitizeError } from "@/lib/sanitize-error";
 
 async function getEnv() {
   try {
@@ -25,6 +27,10 @@ async function getEnv() {
 /** POST /auth/exchange — Exchange OAuth code for encrypted API key cookie */
 export async function POST(request: Request) {
   try {
+    // Enforce origin check to prevent CSRF on code exchange
+    const originError = requireOrigin(request);
+    if (originError) return originError;
+
     const body = (await request.json()) as { code?: string; code_verifier?: string };
     const { code, code_verifier } = body;
 
@@ -55,26 +61,28 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true, connected: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Exchange failed";
-    console.error("[auth/exchange] Error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    const { message, status } = sanitizeError(err, "auth/exchange");
+    return Response.json({ error: message }, { status });
   }
 }
 
 /** DELETE /auth/exchange — Disconnect OpenRouter (clear cookie) */
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
-    // Clear both cookies (remove Secure for dev compat)
+    // Enforce origin check to prevent CSRF on disconnect
+    const originError = requireOrigin(request);
+    if (originError) return originError;
+
+    // Clear both cookies with Secure flag
     const headers = new Headers();
-    headers.append("Set-Cookie", "or_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
-    headers.append("Set-Cookie", "or_ollama_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+    headers.append("Set-Cookie", buildCookieString("or_session", "", { maxAge: 0 }));
+    headers.append("Set-Cookie", buildCookieString("or_ollama_session", "", { maxAge: 0 }));
     return new Response(JSON.stringify({ ok: true, disconnected: true }), {
       status: 200,
       headers,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Disconnect failed";
-    console.error("[auth/exchange] Disconnect error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    const { message, status } = sanitizeError(err, "auth/exchange/disconnect");
+    return Response.json({ error: message }, { status });
   }
 }

@@ -1,6 +1,8 @@
 import { verifyMagicToken } from "@moikapy/magic-link";
+import { sanitizeError } from "@/lib/sanitize-error";
+import { buildCookieString } from "@/lib/origin-guard";
 
-const APP_URL = "https://origen-chat.moikapy.workers.dev";
+const APP_URL = "https://origen.moikapy.dev";
 
 /** GET /api/auth/verify?token=xxx — verify magic link token, set session cookie */
 export async function GET(request: Request) {
@@ -9,12 +11,16 @@ export async function GET(request: Request) {
 
   const result = await verifyMagicToken(token, {
     db: env.DB,
-    encryptKey: env.OPENROUTER_ENCRYPT_KEY,
+    encryptKey: env.OPENROUTER_ENCRYPT_KEY || "",
     baseUrl: env.APP_URL || APP_URL,
   });
 
   if (!result.ok) {
-    return new Response(JSON.stringify(result), {
+    // Sanitize verification errors — don't leak internal token details
+    const safeMessage = result.error === "invalid_token" ? "Invalid or expired verification link."
+      : result.error === "expired_token" ? "Verification link has expired. Please request a new one."
+      : "Verification failed.";
+    return new Response(JSON.stringify({ ok: false, error: safeMessage }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -23,7 +29,7 @@ export async function GET(request: Request) {
   // Set session cookie and redirect home
   const headers = new Headers();
   headers.set("Location", (env.APP_URL || APP_URL) + "/chat");
-  headers.set("Set-Cookie", `magic_session=${result.sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
+  headers.set("Set-Cookie", buildCookieString("magic_session", String(result.sessionId ?? ""), { maxAge: 30 * 24 * 60 * 60 }));
   return new Response(null, { status: 302, headers });
 }
 

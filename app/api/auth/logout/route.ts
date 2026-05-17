@@ -1,20 +1,31 @@
 import { deleteSession } from "@moikapy/magic-link";
+import { requireOrigin, buildCookieString } from "@/lib/origin-guard";
+import { sanitizeError } from "@/lib/sanitize-error";
 
 /** POST /api/auth/logout — end session */
 export async function POST(request: Request) {
-  const sessionId = getSessionId(request);
-  if (sessionId) {
-    const { env } = await getCtx();
-    await deleteSession(env.DB, sessionId);
-  }
+  try {
+    // Enforce origin check to prevent CSRF on logout
+    const originError = requireOrigin(request);
+    if (originError) return originError;
 
-  // Clear cookie
-  return new Response(JSON.stringify({ ok: true }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": "magic_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
-    },
-  });
+    const sessionId = getSessionId(request);
+    if (sessionId) {
+      const { env } = await getCtx();
+      await deleteSession(env.DB, sessionId);
+    }
+
+    // Clear cookie with Secure flag
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": buildCookieString("magic_session", "", { maxAge: 0 }),
+      },
+    });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, "auth/logout");
+    return Response.json({ error: message }, { status });
+  }
 }
 
 function getSessionId(request: Request): string | null {

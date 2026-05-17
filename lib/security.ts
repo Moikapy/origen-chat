@@ -12,7 +12,7 @@ import {
 export const MAX_MESSAGES = 100;
 export const MAX_CONTENT_LENGTH = 10_000; // 10KB per message
 export const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-export const RATE_LIMIT_MAX_REQUESTS = 20; // per IP per minute for anonymous
+export const RATE_LIMIT_MAX_REQUESTS = 10; // per IP per minute for anonymous (reduced from 20)
 export const RATE_LIMIT_MAX_REQUESTS_AUTHED = 60; // per IP per minute for authed
 
 /** Server-side model whitelist — only these models are accepted */
@@ -149,10 +149,17 @@ export async function checkRateLimit(
   return limiter.check(ip, authenticated, userId);
 }
 
-/** Create the rate_limits table if it doesn't exist */
+// Track whether we've ensured the rate limit table exists (singleton per worker instance)
+let rateLimitTableEnsured = false;
+
+/** Create the rate_limits table if it doesn't exist.
+ *  Uses a singleton flag to avoid redundant D1 calls after first request.
+ */
 export async function ensureRateLimitTable(d1: any): Promise<void> {
+  if (rateLimitTableEnsured) return;
   // Delegates to @moikapy/cf-helpers d1-helpers — never d1.exec()
   await ensureTable(d1, "rate_limits", "ip TEXT NOT NULL, user_id TEXT, window_start INTEGER NOT NULL");
   await ensureIndex(d1, "idx_rate_limits_ip", "rate_limits(ip, window_start)");
   await ensureIndex(d1, "idx_rate_limits_user", "rate_limits(user_id, window_start)");
+  rateLimitTableEnsured = true;
 }

@@ -31,14 +31,29 @@ export const MAX_KEY_LENGTH = 100;
 
 /** Patterns that indicate prompt injection attempts */
 const INJECTION_PATTERNS = [
+  // Direct instruction overrides
   /ignore\s+(all\s+)?previous\s+instructions/i,
-  /forget\s+(everything|all|previous)/i,
+  /forget\s+(everything|all|previous|your|my)/i,
   /pretend\s+(you\s+are|to\s+be)/i,
-  /disregard\s+(your|the)\s+(rules|instructions|guidelines)/i,
+  /disregard\s+(your|the)\s+(rules|instructions|guidelines|memory)/i,
+  /override\s+(your|the)\s+(rules|instructions|memory|context)/i,
+  // System prompt injection markers
   /system\s*:/i,
   /\[system\]/i,
   /<\s*system\s*>/i,
-  /override\s+(your|the)\s+(rules|instructions)/i,
+  // Role-switching attempts
+  /you\s+are\s+now\s+a/i,
+  /act\s+as\s+if\s+you/i,
+  /role[\s:]\s*(play|switch|change)/i,
+  // Instruction-separator injection
+  /---+\s*(system|instruction|prompt|memory)\s*---+/i,
+  /```+(system|instruction|prompt|memory)/i,
+  // Data exfiltration attempts via memory
+  /\b(repeat|show|display|reveal|output)\s+(your|the|all)\s+(instruction|prompt|memory|context|rules)/i,
+  // Instruction persistence
+  /always\s+(remember|respond|say|act)/i,
+  /from\s+now\s+on/i,
+  /never\s+forget/i,
 ];
 
 /** Patterns that indicate credential/security data */
@@ -48,10 +63,29 @@ const CREDENTIAL_PATTERNS = [
   /^[a-f0-9]{32,}$/i, // hex strings (likely API keys)
   /^(ghp_|gho_|github_pat_)/i, // GitHub tokens
   /^(AKIA|ASIA)/i, // AWS keys
+  /^(eyJ)/i, // JWT-like base64
 ];
+
+/** Allowed key pattern: lowercase snake_case, alphanumeric + underscore + hyphen */
+const KEY_PATTERN = /^[a-z][a-z0-9_-]{0,98}[a-z0-9]$/;
+
+/** Characters that should never appear in fact values (HTML/control chars) */
+const FORBIDDEN_VALUE_CHARS = /[<>\x00-\x1f\x7f]/;
 
 /**
  * Validate a single fact — reject prompt injections, credentials, empty values.
+ *
+ * Key validation:
+ * - Must be lowercase snake_case (alphanumeric, underscores, hyphens)
+ * - Must start and end with alphanumeric character
+ * - Max 100 characters
+ *
+ * Value validation:
+ * - Must be non-empty, non-whitespace
+ * - Max 2000 characters
+ * - No HTML tags or control characters
+ * - No injection patterns
+ * - No credential patterns
  */
 export function validateFact(fact: { key: string; value: string }): boolean {
   // Empty or whitespace-only
@@ -61,12 +95,19 @@ export function validateFact(fact: { key: string; value: string }): boolean {
   if (fact.value.length > MAX_VALUE_LENGTH) return false;
   if (fact.key.length > MAX_KEY_LENGTH) return false;
 
-  // Check for prompt injection patterns in value
+  // Key must be lowercase snake_case (alphanumeric, underscores, hyphens)
+  if (!KEY_PATTERN.test(fact.key)) return false;
+
+  // No HTML tags or control characters in value
+  if (FORBIDDEN_VALUE_CHARS.test(fact.value)) return false;
+
+  // Check for prompt injection patterns in both key and value
   for (const pattern of INJECTION_PATTERNS) {
     if (pattern.test(fact.value)) return false;
+    if (pattern.test(fact.key)) return false;
   }
 
-  // Check for credential-like keys
+  // Check for credential-like patterns in both key and value
   for (const pattern of CREDENTIAL_PATTERNS) {
     if (pattern.test(fact.key)) return false;
     if (pattern.test(fact.value)) return false;

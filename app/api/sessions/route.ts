@@ -1,76 +1,101 @@
 import { getSessionId, getEnv } from "@/lib/api-utils";
+import { requireOrigin } from "@/lib/origin-guard";
+import { sanitizeError } from "@/lib/sanitize-error";
 
 /** GET /api/sessions — list all sessions for authenticated user */
 export async function GET(request: Request) {
   const auth = await authenticate(request);
   if (!auth) return unauthorized();
 
-  const db = auth.env.DB;
-  const results = await db
-    .prepare("SELECT id, title, model, system_prompt, created_at, updated_at FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC")
-    .bind(auth.userId)
-    .all();
+  try {
+    const db = auth.env.DB;
+    const results = await db
+      .prepare("SELECT id, title, model, system_prompt, created_at, updated_at FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC")
+      .bind(auth.userId)
+      .all();
 
-  return Response.json({ sessions: results.results });
+    return Response.json({ sessions: results.results });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, "sessions/list");
+    return Response.json({ error: message }, { status });
+  }
 }
 
 /** POST /api/sessions — upsert a session for authenticated user */
 export async function POST(request: Request) {
-  const auth = await authenticate(request);
-  if (!auth) return unauthorized();
+  try {
+    // Require valid origin for mutations
+    const originError = requireOrigin(request);
+    if (originError) return originError;
 
-  const body = await request.json() as {
-    id?: string;
-    title?: string;
-    model?: string;
-    systemPrompt?: string;
-    messages?: unknown[];
-    updatedAt?: number;
-  };
+    const auth = await authenticate(request);
+    if (!auth) return unauthorized();
 
-  if (!body.id || !body.model) {
-    return Response.json({ error: "id and model are required" }, { status: 400 });
+    const body = await request.json() as {
+      id?: string;
+      title?: string;
+      model?: string;
+      systemPrompt?: string;
+      messages?: unknown[];
+      updatedAt?: number;
+    };
+
+    if (!body.id || !body.model) {
+      return Response.json({ error: "id and model are required" }, { status: 400 });
+    }
+
+    const db = auth.env.DB;
+
+    // Upsert: insert or replace
+    await db
+      .prepare(
+        `INSERT OR REPLACE INTO chat_sessions (id, user_id, title, model, system_prompt, messages, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        body.id,
+        auth.userId,
+        body.title || "New chat",
+        body.model,
+        body.systemPrompt || null,
+        JSON.stringify(body.messages || []),
+        body.updatedAt ? Math.floor(body.updatedAt / 1000) : Math.floor(Date.now() / 1000),
+        Math.floor(Date.now() / 1000)
+      )
+      .run();
+
+    return Response.json({ ok: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, "sessions/upsert");
+    return Response.json({ error: message }, { status });
   }
-
-  const db = auth.env.DB;
-
-  // Upsert: insert or replace
-  await db
-    .prepare(
-      `INSERT OR REPLACE INTO chat_sessions (id, user_id, title, model, system_prompt, messages, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      body.id,
-      auth.userId,
-      body.title || "New chat",
-      body.model,
-      body.systemPrompt || null,
-      JSON.stringify(body.messages || []),
-      body.updatedAt ? Math.floor(body.updatedAt / 1000) : Math.floor(Date.now() / 1000),
-      Math.floor(Date.now() / 1000)
-    )
-    .run();
-
-  return Response.json({ ok: true });
 }
 
 /** DELETE /api/sessions?id=xxx — delete a session */
 export async function DELETE(request: Request) {
-  const auth = await authenticate(request);
-  if (!auth) return unauthorized();
+  try {
+    // Require valid origin for mutations
+    const originError = requireOrigin(request);
+    if (originError) return originError;
 
-  const url = new URL(request.url);
-  const id = url.searchParams.get("id");
-  if (!id) return Response.json({ error: "id is required" }, { status: 400 });
+    const auth = await authenticate(request);
+    if (!auth) return unauthorized();
 
-  const db = auth.env.DB;
-  await db
-    .prepare("DELETE FROM chat_sessions WHERE id = ? AND user_id = ?")
-    .bind(id, auth.userId)
-    .run();
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id");
+    if (!id) return Response.json({ error: "id is required" }, { status: 400 });
 
-  return Response.json({ ok: true });
+    const db = auth.env.DB;
+    await db
+      .prepare("DELETE FROM chat_sessions WHERE id = ? AND user_id = ?")
+      .bind(id, auth.userId)
+      .run();
+
+    return Response.json({ ok: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, "sessions/delete");
+    return Response.json({ error: message }, { status });
+  }
 }
 
 // ── Auth helpers ────────────────────────────────────────

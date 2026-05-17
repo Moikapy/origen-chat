@@ -3,6 +3,8 @@ import { buildAgentConfig, type ChatConfig } from "@/lib/config";
 import { isFreeModel as checkIsFreeModel, stripOpenrouterPrefix } from "@/lib/models";
 import { getApiKeyFromCookie } from "@moikapy/openrouter-auth/next";
 import { validateChatRequest, checkRateLimit, ensureRateLimitTable } from "@/lib/security";
+import { requireOrigin } from "@/lib/origin-guard";
+import { sanitizeError } from "@/lib/sanitize-error";
 import { getMemoryFromD1 } from "@/lib/memory-store";
 import type { MemoryProvider, MemoryFact } from "@moikapy/origen";
 import { consolidateConversation, createD1MemoryProvider } from "@/lib/consolidate";
@@ -39,12 +41,16 @@ async function getEnv(): Promise<Record<string, string | undefined>> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    // Enforce origin check on mutations to prevent CSRF
+    const originError = requireOrigin(request);
+    if (originError) return originError;
+
     return await handleChatRequest(request);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
+    const { message, status } = sanitizeError(err, "chat");
     return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({ error: message }),
+      { status, headers: { "Content-Type": "application/json" } }
     );
   }
 }

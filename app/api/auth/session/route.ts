@@ -5,6 +5,7 @@
  * so the client knows both: who the user is AND whether they have a key.
  */
 import { decryptApiKey } from "@moikapy/openrouter-auth/crypto";
+import { sanitizeError } from "@/lib/sanitize-error";
 
 async function getEnv() {
   try {
@@ -113,8 +114,7 @@ export async function GET(request: Request) {
       openrouter: openrouterInfo,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Session check failed";
-    console.error("[auth/session] Error:", message);
+    const { message } = sanitizeError(err, "auth/session");
     return Response.json({ user: null, openrouterConnected: false }, { status: 200 });
   }
 }

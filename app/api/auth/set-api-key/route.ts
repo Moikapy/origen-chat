@@ -5,6 +5,8 @@
  * Used when the user pastes their key directly instead of OAuth.
  */
 import { encryptApiKey } from "@moikapy/openrouter-auth";
+import { requireOrigin, buildCookieString } from "@/lib/origin-guard";
+import { sanitizeError } from "@/lib/sanitize-error";
 
 async function getEnv() {
   try {
@@ -24,6 +26,10 @@ const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
 export async function POST(request: Request) {
   try {
+    // Enforce origin check to prevent CSRF
+    const originError = requireOrigin(request);
+    if (originError) return originError;
+
     const body = (await request.json()) as { apiKey?: string };
     const apiKey = body.apiKey?.trim();
 
@@ -53,13 +59,11 @@ export async function POST(request: Request) {
       sessionMaxAge: COOKIE_MAX_AGE,
     });
 
-    // Set the cookie
-    // Note: Don't set Secure flag — Cloudflare Workers terminates TLS at the edge,
-    // so the browser connection is HTTPS but the cookie still needs to work in dev (localhost)
+    // Set the cookie with Secure flag (Cloudflare terminates TLS, so browser connection is always HTTPS)
     const headers = new Headers();
     headers.append(
       "Set-Cookie",
-      `${COOKIE_NAME}=${encrypted}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
+      buildCookieString(COOKIE_NAME, encrypted, { maxAge: COOKIE_MAX_AGE }),
     );
 
     return new Response(JSON.stringify({ ok: true, connected: true }), {
@@ -67,8 +71,7 @@ export async function POST(request: Request) {
       headers,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to save key";
-    console.error("[auth/set-api-key] Error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    const { message, status } = sanitizeError(err, "auth/set-api-key");
+    return Response.json({ error: message }, { status });
   }
 }

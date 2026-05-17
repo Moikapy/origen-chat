@@ -71,6 +71,8 @@ describe("validateChatRequest", () => {
     expect(result.error).toMatch(/invalid role/i);
   });
 
+  // Note: RATE_LIMIT_MAX_REQUESTS reduced from 20 to 10 for anonymous users
+
   it("rejects SSRF ollama URL pointing to AWS metadata", () => {
     const result = validateChatRequest({
       messages: [{ role: "user", content: "hello" }],

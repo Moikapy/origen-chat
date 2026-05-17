@@ -5,7 +5,8 @@
       "ctx_fetch_and_index",
       "write(*.ts)",
       "edit(*.ts)",
-      "bash(cd *)"
+      "bash(cd *)",
+      "bash(find *)"
     ],
     "deny": [],
     "ask": [],

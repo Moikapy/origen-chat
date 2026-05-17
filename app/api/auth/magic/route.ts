@@ -1,24 +1,12 @@
 import { sendMagicLink } from "@moikapy/magic-link";
-
-/** Check that the request comes from our own origin */
-function validateOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-  const allowedOrigins = [
-    "https://origen-chat.moikapy.workers.dev",
-    "http://localhost:3456",
-  ];
-  if (origin && allowedOrigins.some((o) => origin.startsWith(o))) return true;
-  if (referer && allowedOrigins.some((o) => referer.startsWith(o))) return true;
-  return false;
-}
+import { requireOrigin } from "@/lib/origin-guard";
 
 /** POST /api/auth/magic — send magic link email */
 export async function POST(request: Request) {
   try {
-    if (!validateOrigin(request)) {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Enforce origin check to prevent CSRF
+    const originError = requireOrigin(request);
+    if (originError) return originError;
 
     const body: { email?: string } = await request.json() as any;
     const email = body.email;
@@ -43,8 +31,7 @@ export async function POST(request: Request) {
     return Response.json(result);
   } catch (err) {
     console.error("[auth/magic] Error:", err);
-    const message = err instanceof Error ? err.message : "Failed to send email";
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json({ error: "Failed to send magic link. Please try again." }, { status: 500 });
   }
 }
 
