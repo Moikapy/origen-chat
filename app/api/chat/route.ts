@@ -163,10 +163,37 @@ async function handleChatRequest(request: Request): Promise<Response> {
   let apiKey: string;
   let provider: string;
 
-  if (ollamaBaseUrl) {
-    // User is connecting to their own Ollama instance
+  if (ollamaBaseUrl && model.startsWith("ollama/")) {
+    // User explicitly chose an Ollama model — route to Ollama server
     provider = "ollama";
     apiKey = userKey;
+  } else if (ollamaBaseUrl && !model.startsWith("ollama/")) {
+    // User has Ollama config stored but chose a non-Ollama model.
+    // Ignore Ollama config and route to OpenRouter instead.
+    provider = "openrouter";
+    // Fall through to OpenRouter key resolution
+    if (cookieApiKey) {
+      apiKey = cookieApiKey;
+    } else if (isConnected && freeModel && serverFreeKey) {
+      apiKey = serverFreeKey;
+    } else if (freeModel && serverFreeKey) {
+      apiKey = serverFreeKey;
+    } else if (isConnected) {
+      return new Response(
+        JSON.stringify({ error: "Your OpenRouter key couldn't be read. Try reconnecting in Settings, or use a free model." }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    } else if (freeModel) {
+      return new Response(
+        JSON.stringify({ error: "No API key. Sign in or add an OpenRouter key in Settings. Free models need an account but cost $0." }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({ error: "No API key. Premium models require an OpenRouter key. Sign in via Settings." }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
   } else if (cookieApiKey) {
     // User has a decrypted OpenRouter key (OAuth or manual)
     provider = "openrouter";
@@ -207,6 +234,9 @@ async function handleChatRequest(request: Request): Promise<Response> {
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  // DEBUG: Log key resolution
+  console.log(`[chat] model=${model} apiModel=${apiModel} free=${freeModel} connected=${isConnected} cookieKey=${!!cookieApiKey} hasSession=${hasOrSession} provider=${provider} keyLen=${apiKey?.length ?? 0}`);
 
   const config = buildAgentConfig(
     { model: apiModel, wiki, systemPrompt: bodySystemPrompt, provider, apiKey, ollamaBaseUrl, memory, peerProvider, userId: userId ?? undefined } as ChatConfig,
