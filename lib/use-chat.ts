@@ -238,22 +238,32 @@ export function getAuthConfig(): Record<string, string> {
   if (!stored) return {};
   try {
     const config = JSON.parse(stored);
-    if (config.baseUrl) return { ollamaBaseUrl: config.baseUrl, ollamaApiKey: config.apiKey || "" };
+    if (config.apiKey || config.baseUrl) return { ollamaBaseUrl: config.baseUrl || "https://ollama.com", ollamaApiKey: config.apiKey || "" };
     return {};
   } catch {
     return {};
   }
 }
 
-/** Get Ollama base URL from localStorage */
-function getOllamaUrl(): string | null {
+/** Get Ollama config (URL + API key) from localStorage */
+function getOllamaConfig(): { url: string; apiKey: string } | null {
   if (typeof window === "undefined") return null;
-  const stored = localStorage.getItem("ollama_url");
-  return stored ? stored.replace(/\/+$/, "") : null;
+  const stored = localStorage.getItem("origen_ollama_config");
+  if (!stored) return null;
+  try {
+    const config = JSON.parse(stored);
+    if (!config.apiKey) return null;
+    return {
+      url: (config.baseUrl || "https://ollama.com").replace(/\/+$/, ""),
+      apiKey: config.apiKey,
+    };
+  } catch {
+    return null;
+  }
 }
 
-/** Send messages directly to a local Ollama instance from the browser.
- *  Bypasses the server entirely — works with localhost Ollama.
+/** Send messages to Ollama Cloud API from the browser.
+ *  Uses the cloud endpoint with Bearer auth — no CORS issues.
  */
 async function sendToOllama(
   messages: ChatMessageInput[],
@@ -262,10 +272,10 @@ async function sendToOllama(
   abort: AbortController,
   config: UseChatConfig,
 ): Promise<void> {
-  const ollamaUrl = getOllamaUrl();
-  if (!ollamaUrl) {
+  const ollamaConfig = getOllamaConfig();
+  if (!ollamaConfig) {
     await config.finalizeMessage({
-      content: "Ollama not configured. Set your Ollama URL in Settings.",
+      content: "Ollama not configured. Add your API key in Settings.",
       streaming: false,
       isError: true,
     }, sessionId);
@@ -275,9 +285,12 @@ async function sendToOllama(
   // Strip ollama/ prefix to get the model name Ollama expects
   const ollamaModel = model.replace(/^ollama\//, "");
 
-  const res = await fetch(`${ollamaUrl}/api/chat`, {
+  const res = await fetch(`${ollamaConfig.url}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${ollamaConfig.apiKey}`,
+    },
     body: JSON.stringify({
       model: ollamaModel,
       messages: config.systemPrompt

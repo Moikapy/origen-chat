@@ -98,7 +98,7 @@ export function ModelSelector({
 
       {/* Ollama models — shows when connected to a local Ollama instance */}
       {ollamaConnected && ollamaModels.length > 0 && (
-        <optgroup label="Ollama (local)">
+        <optgroup label="Ollama Cloud">
           {ollamaModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name} ({m.sizeLabel})

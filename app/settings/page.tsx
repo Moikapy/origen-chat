@@ -14,14 +14,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keySuccess, setKeySuccess] = useState(false);
-  const { url: ollamaUrl, connected: ollamaConnected, models: ollamaModels, saveUrl: saveOllamaUrl, disconnect: disconnectOllama } = useOllama();
-  const [ollamaInput, setOllamaInput] = useState("");
+  const { url: ollamaUrl, apiKey: ollamaApiKey, connected: ollamaConnected, models: ollamaModels, saveConfig: saveOllamaConfig, disconnect: disconnectOllama } = useOllama();
+  const [ollamaUrlInput, setOllamaUrlInput] = useState("https://ollama.com");
+  const [ollamaKeyInput, setOllamaKeyInput] = useState("");
   const [ollamaSuccess, setOllamaSuccess] = useState(false);
 
-  // Sync input with hook URL on mount
+  // Sync inputs with hook state on mount
   useEffect(() => {
-    if (ollamaUrl) setOllamaInput(ollamaUrl);
-  }, [ollamaUrl]);
+    if (ollamaUrl) setOllamaUrlInput(ollamaUrl);
+    if (ollamaApiKey) setOllamaKeyInput(ollamaApiKey);
+  }, [ollamaUrl, ollamaApiKey]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -59,7 +61,7 @@ export default function SettingsPage() {
   };
 
   const handleSaveOllama = () => {
-    saveOllamaUrl(ollamaInput);
+    saveOllamaConfig(ollamaUrlInput, ollamaKeyInput);
     setOllamaSuccess(true);
     setTimeout(() => setOllamaSuccess(false), 2000);
   };
@@ -266,7 +268,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">Ollama</p>
+                  <p className="font-medium">Ollama Cloud</p>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       ollamaConnected ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
@@ -278,27 +280,36 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {ollamaConnected
                     ? `${ollamaModels.length} model${ollamaModels.length !== 1 ? "s" : ""} available`
-                    : "Run local models privately on your own machine."}
+                    : "Use Ollama cloud models with your API key."}
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
+              <label className="text-xs text-muted-foreground">API URL</label>
               <input
                 type="url"
-                value={ollamaInput}
-                onChange={(e) => setOllamaInput(e.target.value)}
-                placeholder="http://localhost:11434"
+                value={ollamaUrlInput}
+                onChange={(e) => setOllamaUrlInput(e.target.value)}
+                placeholder="https://ollama.com"
+                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+              />
+              <label className="text-xs text-muted-foreground">API Key</label>
+              <input
+                type="password"
+                value={ollamaKeyInput}
+                onChange={(e) => setOllamaKeyInput(e.target.value)}
+                placeholder="your-ollama-api-key"
                 className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
               />
               <button
                 onClick={handleSaveOllama}
                 className="w-full text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors"
               >
-                Save Ollama URL
+                Save
               </button>
               {ollamaSuccess && (
-                <p className="text-xs text-green-400">Ollama URL saved!</p>
+                <p className="text-xs text-green-400">Connected!</p>
               )}
 
               {ollamaConnected && (
@@ -325,8 +336,8 @@ export default function SettingsPage() {
             )}
 
             <div className="bg-muted/30 rounded-lg px-4 py-3 text-xs text-muted-foreground">
-              <p>Connect to a local or cloud Ollama instance to use models running on your own hardware. No API costs. Full privacy.</p>
-              <p className="mt-1.5">If models don't appear, set <code className="bg-muted px-1 py-0.5 rounded text-[10px]">OLLAMA_ORIGINS=*</code> in your Ollama environment to allow browser access.</p>
+              <p>Use Ollama models via the cloud API. Get your API key at <a href="https://ollama.com" target="_blank" rel="noopener" className="text-primary hover:underline">ollama.com</a>.</p>
+              <p className="mt-1.5">Local Ollama support coming soon via the Origen CLI.</p>
             </div>
           </div>
         </section>

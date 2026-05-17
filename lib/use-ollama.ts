@@ -1,9 +1,9 @@
 /**
- * Ollama integration hook — fetches models and handles client-side chat.
+ * Ollama Cloud integration hook — connects to Ollama's cloud API.
  *
- * Ollama runs on the user's machine (localhost:11434). Since the server
- * (Cloudflare Workers) can't reach localhost, we call Ollama directly
- * from the browser. This is also more private — no server in the middle.
+ * Default: https://ollama.com/api with API key auth.
+ * No localhost, no CORS issues — cloud-first approach.
+ * Local Ollama support will come via a future TUI tool.
  */
 import { useState, useEffect, useCallback } from "react";
 
@@ -16,61 +16,36 @@ export interface OllamaModel {
   sizeLabel: string;
 }
 
-const STORAGE_KEY = "ollama_url";
+const STORAGE_KEY = "origen_ollama_config";
+const CLOUD_URL = "https://ollama.com";
 
 export function useOllama() {
   const [url, setUrlInternal] = useState<string>("");
+  const [apiKey, setApiKeyInternal] = useState<string>("");
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Auto-detect: if no URL saved, try localhost:11434 on mount
+  // Load config from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setUrlInternal(saved);
-    } else {
-      // Auto-probe localhost:11434 — if Ollama is running, auto-connect
-      fetch("http://localhost:11434/api/tags", {
-        signal: AbortSignal.timeout(3000),
-      })
-        .then((res) => {
-          if (res.ok) {
-            setUrlInternal("http://localhost:11434");
-            localStorage.setItem(STORAGE_KEY, "http://localhost:11434");
-            localStorage.setItem("origen_ollama_config", JSON.stringify({ baseUrl: "http://localhost:11434", apiKey: "" }));
-          }
-        })
-        .catch(() => {
-          // Ollama not running or CORS blocked — that's fine, user can configure in Settings
-        });
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const config = JSON.parse(stored);
+        if (config.apiKey) {
+          setUrlInternal(config.baseUrl || CLOUD_URL);
+          setApiKeyInternal(config.apiKey);
+        }
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
-  /** Test connection and return detailed status */
-  const testConnection = useCallback(async (testUrl?: string): Promise<{ ok: boolean; error?: string }> => {
-    const baseUrl = (testUrl || url || "").replace(/\/+$/, "");
-    if (!baseUrl) return { ok: false, error: "No URL configured" };
-
-    try {
-      const res = await fetch(`${baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return { ok: true };
-      return { ok: false, error: `HTTP ${res.status}` };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        return { ok: false, error: "CORS blocked. Set OLLAMA_ORIGINS=* in your Ollama environment." };
-      }
-      return { ok: false, error: msg };
-    }
-  }, [url]);
-
-  // Fetch models when URL is set
-  const refreshModels = useCallback(async (ollamaUrl?: string) => {
-    const baseUrl = (ollamaUrl || url || "").replace(/\/+$/, "");
-    if (!baseUrl) {
+  // Fetch models when we have an API key
+  const refreshModels = useCallback(async (configKey?: string) => {
+    const key = configKey || apiKey;
+    if (!key) {
       setModels([]);
       setConnected(false);
       return;
@@ -78,8 +53,12 @@ export function useOllama() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5000),
+      const res = await fetch(`${url || CLOUD_URL}/api/tags`, {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { models?: Array<{ name: string; size: number; modified_at: string }> };
@@ -98,51 +77,72 @@ export function useOllama() {
     } finally {
       setLoading(false);
     }
-  }, [url]);
+  }, [apiKey, url]);
 
-  // Auto-fetch models when URL changes
+  // Auto-fetch models when API key is set
   useEffect(() => {
-    if (url) {
+    if (apiKey) {
       refreshModels();
     }
-  }, [url, refreshModels]);
+  }, [apiKey, refreshModels]);
 
-  /** Save Ollama URL to localStorage */
-  const saveUrl = useCallback((newUrl: string) => {
-    const trimmed = newUrl.trim().replace(/\/+$/, "");
-    if (trimmed) {
-      localStorage.setItem(STORAGE_KEY, trimmed);
+  /** Save Ollama config to localStorage */
+  const saveConfig = useCallback((newUrl: string, newApiKey: string) => {
+    const trimmedUrl = newUrl.trim().replace(/\/+$/, "") || CLOUD_URL;
+    const trimmedKey = newApiKey.trim();
+
+    if (trimmedKey) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        baseUrl: trimmedUrl,
+        apiKey: trimmedKey,
+      }));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
-    setUrlInternal(trimmed);
 
-    // Also save in the format use-chat's getAuthConfig() reads
-    const config = trimmed
-      ? JSON.stringify({ baseUrl: trimmed, apiKey: "" })
-      : "";
-    if (config) {
-      localStorage.setItem("origen_ollama_config", config);
-    } else {
-      localStorage.removeItem("origen_ollama_config");
-    }
+    setUrlInternal(trimmedUrl);
+    setApiKeyInternal(trimmedKey);
   }, []);
 
   /** Clear Ollama config */
   const disconnect = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("origen_ollama_config");
     setUrlInternal("");
+    setApiKeyInternal("");
     setModels([]);
     setConnected(false);
   }, []);
 
+  /** Test connection and return detailed status */
+  const testConnection = useCallback(async (testUrl?: string, testKey?: string): Promise<{ ok: boolean; error?: string }> => {
+    const baseUrl = (testUrl || url || CLOUD_URL).replace(/\/+$/, "");
+    const key = testKey || apiKey;
+    if (!key) return { ok: false, error: "API key required" };
+
+    try {
+      const res = await fetch(`${baseUrl}/api/tags`, {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return { ok: true };
+      if (res.status === 401) return { ok: false, error: "Invalid API key" };
+      return { ok: false, error: `HTTP ${res.status}` };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return { ok: false, error: msg };
+    }
+  }, [url, apiKey]);
+
   return {
     url,
+    apiKey,
     models,
     connected,
     loading,
-    saveUrl,
+    saveConfig,
     disconnect,
     refreshModels,
     testConnection,
