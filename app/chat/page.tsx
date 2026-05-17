@@ -330,10 +330,10 @@ function ChatPageInner() {
         )}
 
         {/* Input */}
-        <footer className="border-t border-border px-4 py-3 safe-bottom">
+        <footer className="border-t border-border px-4 pb-5 pt-3 safe-bottom">
           <div className="mx-auto max-w-3xl">
             <div
-              className="flex gap-2 items-center border border-border rounded-lg bg-card p-3 focus-within:ring-2 focus-within:ring-ring"
+              className="border border-border rounded-xl bg-card p-3 pt-2 focus-within:ring-2 focus-within:ring-ring"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -341,36 +341,41 @@ function ChatPageInner() {
                 }
               }}
             >
-              <ModelSelector
-                value={model}
-                onChange={setModel}
-                freeOnly={!user && !openrouterConnected}
-                byok={openrouterConnected}
-              />
-              <div className="flex-1 min-h-[2rem]">
+              {/* Text input area */}
+              <div className="min-h-[2rem]">
                 <EditorContent editor={editor} />
               </div>
-              <div className="flex-shrink-0">
-                {streaming ? (
-                  <button
-                    onClick={stop}
-                    className="text-sm px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Stop
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSend}
-                    disabled={!editor?.getText().trim()}
-                    className="text-sm px-4 py-2 rounded-md bg-foreground text-background hover:opacity-90 transition-colors disabled:opacity-30"
-                  >
-                    Send
-                  </button>
-                )}
+              {/* Bottom row: model selector + send */}
+              <div className="flex items-center gap-2 mt-2">
+                <ModelSelector
+                  value={model}
+                  onChange={setModel}
+                  freeOnly={!user && !openrouterConnected}
+                  byok={openrouterConnected}
+                />
+                <div className="flex-1" />
+                <div className="flex-shrink-0">
+                  {streaming ? (
+                    <button
+                      onClick={stop}
+                      className="text-sm px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSend}
+                      disabled={!editor?.getText().trim()}
+                      className="text-sm px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition-colors disabled:opacity-30"
+                    >
+                      Send
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
