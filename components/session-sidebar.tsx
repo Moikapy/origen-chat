@@ -246,7 +246,7 @@ export function SessionSidebar({
   collapsed,
   loading,
 }: SessionSidebarProps) {
-  const { user } = useAuth();
+  const { user, openrouterConnected, connectOpenRouter, disconnectOpenRouter } = useAuth();
   const grouped = groupSessions(sessions);
 
   return (
@@ -291,10 +291,20 @@ export function SessionSidebar({
           </div>
 
           {/* Model selector */}
-          <ModelSelector value={activeModel} onChange={onModelChange} freeOnly={!user} />
-          {!user && (
+          <ModelSelector
+            value={activeModel}
+            onChange={onModelChange}
+            freeOnly={!user && !openrouterConnected}
+            byok={openrouterConnected}
+          />
+          {!user && !openrouterConnected && (
             <p className="text-[11px] text-muted-foreground mt-1.5 px-0.5">
               <a href="/auth/login" className="text-primary hover:underline">Sign in</a> to use premium models
+            </p>
+          )}
+          {openrouterConnected && !user && (
+            <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
+              BYOK connected — all models on your key
             </p>
           )}
 
@@ -356,22 +366,41 @@ export function SessionSidebar({
         {/* Footer: auth/status */}
         <div className="border-t border-border p-3">
           {user ? (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
-              <button
-                onClick={() => {
-                  // parent handles logout via auth hook
-                  window.location.href = "/api/auth/logout";
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Sign out
-              </button>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                <a href="/settings" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Settings
+                </a>
+              </div>
+              {openrouterConnected ? (
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  OpenRouter connected
+                </p>
+              ) : (
+                <button
+                  onClick={connectOpenRouter}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Connect OpenRouter
+                </button>
+              )}
             </div>
           ) : (
-            <a href="/auth/login" className="text-xs text-primary hover:underline">
-              Sign in for premium models &rarr;
-            </a>
+            <div className="space-y-1">
+              <a href="/auth/login" className="text-xs text-primary hover:underline block">
+                Sign in for premium models &rarr;
+              </a>
+              {!openrouterConnected && (
+                <button
+                  onClick={connectOpenRouter}
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors block"
+                >
+                  or connect OpenRouter (BYOK)
+                </button>
+              )}
+            </div>
           )}
         </div>
       </aside>
