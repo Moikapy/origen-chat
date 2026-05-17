@@ -96,14 +96,20 @@ export function ModelSelector({
         </optgroup>
       )}
 
-      {/* Ollama models — shows when connected to a local Ollama instance */}
-      {ollamaConnected && ollamaModels.length > 0 && (
+      {/* Ollama — connected shows models, disconnected shows setup prompt */}
+      {ollamaConnected && ollamaModels.length > 0 ? (
         <optgroup label="Ollama Cloud">
           {ollamaModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name} ({m.sizeLabel})
             </option>
           ))}
+        </optgroup>
+      ) : (
+        <optgroup label="Ollama Cloud">
+          <option value="__ollama_setup__" disabled>
+            Add API key in Settings
+          </option>
         </optgroup>
       )}
     </select>

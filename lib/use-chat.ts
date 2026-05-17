@@ -246,24 +246,31 @@ export function getAuthConfig(): Record<string, string> {
 }
 
 /** Get Ollama config (URL + API key) from localStorage */
-function getOllamaConfig(): { url: string; apiKey: string } | null {
+function getOllamaConfig(): { url: string; apiKey: string; mode: string } | null {
   if (typeof window === "undefined") return null;
   const stored = localStorage.getItem("origen_ollama_config");
   if (!stored) return null;
   try {
     const config = JSON.parse(stored);
+    // Cloud mode requires API key; local mode works without
+    if (config.mode === "local") {
+      const baseUrl = (config.baseUrl || "http://localhost:11434").replace(/\/+$/, "");
+      return { url: baseUrl, apiKey: "", mode: "local" };
+    }
     if (!config.apiKey) return null;
     return {
       url: (config.baseUrl || "https://ollama.com").replace(/\/+$/, ""),
       apiKey: config.apiKey,
+      mode: "cloud",
     };
   } catch {
     return null;
   }
 }
 
-/** Send messages to Ollama Cloud API from the browser.
- *  Uses the cloud endpoint with Bearer auth — no CORS issues.
+/** Send messages to Ollama from the browser.
+ *  Cloud mode: Bearer token auth to ollama.com
+ *  Local mode: No auth, directly to localhost (requires OLLAMA_ORIGINS=*)
  */
 async function sendToOllama(
   messages: ChatMessageInput[],
@@ -275,7 +282,7 @@ async function sendToOllama(
   const ollamaConfig = getOllamaConfig();
   if (!ollamaConfig) {
     await config.finalizeMessage({
-      content: "Ollama not configured. Add your API key in Settings.",
+      content: "Ollama not configured. Connect Ollama in Settings.",
       streaming: false,
       isError: true,
     }, sessionId);
@@ -285,12 +292,14 @@ async function sendToOllama(
   // Strip ollama/ prefix to get the model name Ollama expects
   const ollamaModel = model.replace(/^ollama\//, "");
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (ollamaConfig.apiKey) {
+    headers["Authorization"] = `Bearer ${ollamaConfig.apiKey}`;
+  }
+
   const res = await fetch(`${ollamaConfig.url}/api/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${ollamaConfig.apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model: ollamaModel,
       messages: config.systemPrompt

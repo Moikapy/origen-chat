@@ -14,16 +14,18 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keySuccess, setKeySuccess] = useState(false);
-  const { url: ollamaUrl, apiKey: ollamaApiKey, connected: ollamaConnected, models: ollamaModels, saveConfig: saveOllamaConfig, disconnect: disconnectOllama } = useOllama();
+  const { url: ollamaUrl, apiKey: ollamaApiKey, mode: ollamaMode, connected: ollamaConnected, models: ollamaModels, saveConfig: saveOllamaConfig, disconnect: disconnectOllama } = useOllama();
   const [ollamaUrlInput, setOllamaUrlInput] = useState("https://ollama.com");
   const [ollamaKeyInput, setOllamaKeyInput] = useState("");
+  const [ollamaModeInput, setOllamaModeInput] = useState<"cloud" | "local">("cloud");
   const [ollamaSuccess, setOllamaSuccess] = useState(false);
 
   // Sync inputs with hook state on mount
   useEffect(() => {
     if (ollamaUrl) setOllamaUrlInput(ollamaUrl);
     if (ollamaApiKey) setOllamaKeyInput(ollamaApiKey);
-  }, [ollamaUrl, ollamaApiKey]);
+    setOllamaModeInput(ollamaMode);
+  }, [ollamaUrl, ollamaApiKey, ollamaMode]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -61,7 +63,7 @@ export default function SettingsPage() {
   };
 
   const handleSaveOllama = () => {
-    saveOllamaConfig(ollamaUrlInput, ollamaKeyInput);
+    saveOllamaConfig(ollamaUrlInput, ollamaKeyInput, ollamaModeInput);
     setOllamaSuccess(true);
     setTimeout(() => setOllamaSuccess(false), 2000);
   };
@@ -268,7 +270,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">Ollama Cloud</p>
+                  <p className="font-medium">Ollama</p>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       ollamaConnected ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
@@ -280,28 +282,57 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {ollamaConnected
                     ? `${ollamaModels.length} model${ollamaModels.length !== 1 ? "s" : ""} available`
-                    : "Use Ollama cloud models with your API key."}
+                    : "Connect your Ollama instance."}
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
+              {/* Mode toggle: Cloud vs Local */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setOllamaModeInput("cloud")}
+                  className={`flex-1 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                    ollamaModeInput === "cloud" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
+                  }`}
+                >
+                  Cloud
+                </button>
+                <button
+                  onClick={() => setOllamaModeInput("local")}
+                  className={`flex-1 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                    ollamaModeInput === "local" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
+                  }`}
+                >
+                  Local
+                </button>
+              </div>
+
               <label className="text-xs text-muted-foreground">API URL</label>
               <input
                 type="url"
-                value={ollamaUrlInput}
+                value={ollamaModeInput === "local" ? (ollamaUrlInput || "http://localhost:11434") : ollamaUrlInput}
                 onChange={(e) => setOllamaUrlInput(e.target.value)}
-                placeholder="https://ollama.com"
+                placeholder={ollamaModeInput === "local" ? "http://localhost:11434" : "https://ollama.com"}
                 className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
               />
-              <label className="text-xs text-muted-foreground">API Key</label>
-              <input
-                type="password"
-                value={ollamaKeyInput}
-                onChange={(e) => setOllamaKeyInput(e.target.value)}
-                placeholder="your-ollama-api-key"
-                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-              />
+              {ollamaModeInput === "cloud" && (
+                <>
+                  <label className="text-xs text-muted-foreground">API Key</label>
+                  <input
+                    type="password"
+                    value={ollamaKeyInput}
+                    onChange={(e) => setOllamaKeyInput(e.target.value)}
+                    placeholder="your-ollama-api-key"
+                    className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                  />
+                </>
+              )}
+              {ollamaModeInput === "local" && (
+                <p className="text-xs text-muted-foreground">
+                  Local Ollama requires <code className="bg-muted px-1 py-0.5 rounded text-[10px]">OLLAMA_ORIGINS=*</code> for browser access. Otherwise use Cloud mode.
+                </p>
+              )}
               <button
                 onClick={handleSaveOllama}
                 className="w-full text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors"
@@ -336,8 +367,8 @@ export default function SettingsPage() {
             )}
 
             <div className="bg-muted/30 rounded-lg px-4 py-3 text-xs text-muted-foreground">
-              <p>Use Ollama models via the cloud API. Get your API key at <a href="https://ollama.com" target="_blank" rel="noopener" className="text-primary hover:underline">ollama.com</a>.</p>
-              <p className="mt-1.5">Local Ollama support coming soon via the Origen CLI.</p>
+              <p>Cloud: use any Ollama model without running anything locally. Get an API key at <a href="https://ollama.com" target="_blank" rel="noopener" className="text-primary hover:underline">ollama.com</a>.</p>
+              <p className="mt-1">Local: connect to Ollama on your machine. Zero cost, full privacy. Requires CORS setup.</p>
             </div>
           </div>
         </section>
