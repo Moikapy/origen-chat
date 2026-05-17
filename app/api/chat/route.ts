@@ -130,6 +130,7 @@ async function handleChatRequest(request: Request): Promise<Response> {
 
   // 1. Try user's own key (OpenRouter OAuth cookie)
   let cookieApiKey: string | null = null;
+  let hasOrSession = false;
   try {
     if (env.OPENROUTER_ENCRYPT_KEY) {
       cookieApiKey = await getApiKeyFromCookie({
@@ -137,14 +138,25 @@ async function handleChatRequest(request: Request): Promise<Response> {
         previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
       });
     }
+    // ADR-007: Check if or_session cookie exists even if decrypt failed
+    // Cookie presence proves user connected — fall back to server key for free models
+    const cookieHeader = request.headers.get("cookie") || "";
+    hasOrSession = cookieHeader.includes("or_session=");
   } catch {
-    // Cookie decryption failed or cookies() unavailable — treat as no user key
+    // Cookie decryption failed or cookies() unavailable
+    // ADR-007: Still check for cookie presence
+    try {
+      const cookieHeader = request.headers.get("cookie") || "";
+      hasOrSession = cookieHeader.includes("or_session=");
+    } catch { /* no cookies available */ }
   }
 
   // 2. Try client-passed Ollama key
   const userKey = cookieApiKey || ollamaApiKey || "";
 
   // 3. Determine final API key
+  // ADR-007: If user has or_session cookie but decrypt failed, they're still "connected"
+  const isConnected = !!(cookieApiKey || hasOrSession || ollamaApiKey);
   const freeModel = checkIsFreeModel(model);
   const serverFreeKey = env.OPENROUTER_FREE_KEY || "";
 
@@ -155,16 +167,31 @@ async function handleChatRequest(request: Request): Promise<Response> {
     // User is connecting to their own Ollama instance
     provider = "ollama";
     apiKey = userKey;
-  } else if (userKey) {
-    // User has their own OpenRouter key (OAuth or manual)
+  } else if (cookieApiKey) {
+    // User has a decrypted OpenRouter key (OAuth or manual)
     provider = "openrouter";
-    apiKey = userKey;
-  } else if (freeModel && serverFreeKey) {
-    // No user key, but model is free and we have a server key
+    apiKey = cookieApiKey;
+  } else if (isConnected && freeModel && serverFreeKey) {
+    // ADR-007: User has or_session cookie (connected) but key decrypt failed.
+    // Use server free key for free models — the user is authenticated,
+    // their key is just encrypted in a format we can't read right now.
     provider = "openrouter";
     apiKey = serverFreeKey;
+  } else if (freeModel && serverFreeKey) {
+    // Anonymous user on a free model — use server key
+    provider = "openrouter";
+    apiKey = serverFreeKey;
+  } else if (isConnected) {
+    // User is connected (has cookie) but no decrypted key and no server free key
+    // This means they're trying a premium model with a broken cookie
+    return new Response(
+      JSON.stringify({
+        error: "Your OpenRouter key couldn't be read. Try reconnecting in Settings, or use a free model.",
+      }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
   } else if (freeModel) {
-    // Free model but no server key configured — still need auth
+    // Free model but no server key configured
     return new Response(
       JSON.stringify({
         error: "No API key. Sign in or add an OpenRouter key in Settings. Free models need an account but cost $0.",
