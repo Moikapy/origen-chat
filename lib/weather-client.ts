@@ -1,7 +1,7 @@
 /**
  * NWS Weather API client — free, no API key, US-only.
  *
- * All endpoints return JSON-LD. We extract the properties we need.
+ * All endpoints return JSON-LD. We extract the data we need.
  * Must set a User-Agent header or NWS returns 403.
  *
  * Flow: location → /points/{lat},{lon} → gridpoint URLs → forecast/alerts
@@ -11,8 +11,8 @@ const NWS_BASE = "https://api.weather.gov";
 const USER_AGENT = "OrigenChat/1.0 (origen-chat.moikapy.workers.dev)";
 
 // ── Geocoding ──────────────────────────────────────────────────────────
-// NWS doesn't have a geocoding endpoint. We use the Nominatim (OpenStreetMap)
-// geocoder to convert city names and ZIP codes to lat/lon.
+// NWS doesn't have a geocoding endpoint. We use Nominatim (OpenStreetMap)
+// to convert city names and ZIP codes to lat/lon.
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
 
@@ -25,7 +25,6 @@ interface GeoResult {
 }
 
 export async function geocodeLocation(query: string): Promise<GeoResult> {
-  // Add ", USA" bias for US results (NWS only covers US)
   const q = /\d{5}/.test(query) ? `${query}, USA` : `${query}, USA`;
 
   const url = `${NOMINATIM_BASE}?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=us`;
@@ -80,16 +79,15 @@ interface NWSPoint {
 
 export async function getPoint(lat: number, lon: number): Promise<NWSPoint> {
   const url = `${NWS_BASE}/points/${lat.toFixed(4)},${lon.toFixed(4)}`;
-  const res = await nwsFetch(url);
-
-  const props = res.properties;
+  const data = await nwsFetch(url);
+  const props = data.properties || data;
   const rel = props.relativeLocation?.properties || {};
 
   return {
     gridId: props.gridId,
     gridX: props.gridX,
     gridY: props.gridY,
-    city: rel.city || props.cwa || "",
+    city: rel.city || "",
     state: rel.state || "",
     timeZone: props.timeZone || "America/New_York",
     sunrise: props.astronomicalData?.sunrise,
@@ -117,13 +115,16 @@ export interface ForecastPeriod {
 }
 
 export async function getForecast(forecastUrl: string): Promise<ForecastPeriod[]> {
-  const res = await nwsFetch(forecastUrl);
-  return res.properties.periods;
+  const data = await nwsFetch(forecastUrl);
+  // JSON-LD format: periods at top level or in properties
+  const periods = data.periods || data.properties?.periods || [];
+  return periods;
 }
 
 export async function getHourlyForecast(hourlyUrl: string): Promise<ForecastPeriod[]> {
-  const res = await nwsFetch(hourlyUrl);
-  return res.properties.periods;
+  const data = await nwsFetch(hourlyUrl);
+  const periods = data.periods || data.properties?.periods || [];
+  return periods;
 }
 
 // ── NWS Alerts ──────────────────────────────────────────────────────────
@@ -142,20 +143,24 @@ export interface WeatherAlert {
 
 export async function getAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
   const url = `${NWS_BASE}/alerts?point=${lat.toFixed(4)},${lon.toFixed(4)}`;
-  const res = await nwsFetch(url);
+  const data = await nwsFetch(url);
 
-  const features = res.features || [];
-  return features.map((f: any) => ({
-    id: f.id || "",
-    event: f.properties.event,
-    severity: f.properties.severity || "Unknown",
-    urgency: f.properties.urgency || "",
-    headline: f.properties.headline || f.properties.event,
-    description: f.properties.description || "",
-    instruction: f.properties.instruction || "",
-    starts: f.properties.onset || f.properties.effective || "",
-    expires: f.properties.expires || "",
-  }));
+  // JSON-LD alerts come in @graph, regular JSON in features
+  const features = data.features || data["@graph"] || [];
+  return features.map((f: any) => {
+    const props = f.properties || f;
+    return {
+      id: f.id || props.id || "",
+      event: props.event || "",
+      severity: props.severity || "Unknown",
+      urgency: props.urgency || "",
+      headline: props.headline || props.event || "",
+      description: props.description || "",
+      instruction: props.instruction || "",
+      starts: props.onset || props.effective || "",
+      expires: props.expires || "",
+    };
+  });
 }
 
 // ── NWS Current Observation ─────────────────────────────────────────────
@@ -173,32 +178,27 @@ export interface CurrentObservation {
 }
 
 export async function getCurrentObservation(stationsUrl: string): Promise<CurrentObservation | null> {
-  // Get the first observation station
-  const stationsRes = await nwsFetch(stationsUrl);
-  const stations = stationsRes.features || stationsRes.observationStations || [];
-  if (!stations.length) {
-    // Try as array of strings
-    const stationUrls = stationsRes.observationStations || [];
+  try {
+    const data = await nwsFetch(stationsUrl);
+    // JSON-LD: observationStations is an array of URLs
+    const stationUrls: string[] = data.observationStations || (data.features || []).map((f: any) => f.id || f).filter(Boolean);
     if (!stationUrls.length) return null;
+
     const stationUrl = stationUrls[0];
     const stationId = stationUrl.split("/").pop();
     if (!stationId) return null;
+
     return getObservationForStation(stationId);
+  } catch {
+    return null;
   }
-
-  const stationId = (typeof stations[0] === "string")
-    ? stations[0].split("/").pop()
-    : stations[0].properties?.stationIdentifier || stations[0].id?.split("/").pop();
-
-  if (!stationId) return null;
-  return getObservationForStation(stationId);
 }
 
 async function getObservationForStation(stationId: string): Promise<CurrentObservation | null> {
   try {
     const url = `${NWS_BASE}/stations/${stationId}/observations/latest`;
-    const res = await nwsFetch(url);
-    const props = res.properties;
+    const data = await nwsFetch(url);
+    const props = data.properties || data;
 
     return {
       temperature: fahrenheitFromCelsius(props.temperature?.value),
@@ -206,7 +206,7 @@ async function getObservationForStation(stationId: string): Promise<CurrentObser
       description: props.textDescription || "",
       icon: props.icon || "",
       windSpeed: props.windSpeed?.value != null
-        ? `${Math.round(props.windSpeed.value * 1.944)} mph` // m/s to mph
+        ? `${Math.round(props.windSpeed.value * 1.944)} mph`
         : "N/A",
       windDirection: props.windDirection?.value != null
         ? degreeToDirection(props.windDirection.value)
