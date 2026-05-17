@@ -30,6 +30,7 @@
     "@tiptap/react": "^2.6.0",
     "@tiptap/starter-kit": "^2.6.0",
     "dotenv": "^17.4.2",
+    "mimetext": "^3.0.28",
     "next": "^15.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

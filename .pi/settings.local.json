@@ -8,7 +8,8 @@
       "bash(cd *)",
       "bash(find *)",
       "ctx_search",
-      "write(*.md)"
+      "write(*.md)",
+      "pi_web_search"
     ],
     "deny": [],
     "ask": [],
