@@ -6,7 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 export default function SettingsPage() {
-  const { user, loading, openrouterConnected, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
+  const { user, loading, openrouterConnected, openrouterInfo, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
   const { facts } = useMemory();
   const [disconnecting, setDisconnecting] = useState(false);
   const [manualKey, setManualKey] = useState("");
@@ -137,21 +137,43 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {openrouterConnected ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Encrypted key stored</p>
-                  <p className="text-xs text-muted-foreground">
-                    BYOK: You pay OpenRouter directly. No credit usage on our end.
-                  </p>
+              {openrouterConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Encrypted key stored</p>
+                    <p className="text-xs text-muted-foreground">
+                      BYOK: You pay OpenRouter directly
+                    </p>
+                    {openrouterInfo && (
+                      <div className="mt-2 pt-2 border-t border-border">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Balance</span>
+                          <span className="text-foreground font-medium">${openrouterInfo.balance.toFixed(2)}</span>
+                        </div>
+                        {openrouterInfo.usageMonthly > 0 && (
+                          <div className="flex justify-between text-xs mt-1">
+                            <span className="text-muted-foreground">Usage this month</span>
+                            <span className="text-foreground">${openrouterInfo.usageMonthly.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {openrouterInfo.usageDaily > 0 && (
+                          <div className="flex justify-between text-xs mt-1">
+                            <span className="text-muted-foreground">Usage today</span>
+                            <span className="text-foreground">${openrouterInfo.usageDaily.toFixed(4)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="text-sm px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                  >
+                    {disconnecting ? "Disconnecting..." : "Disconnect"}
+                  </button>
                 </div>
-                <button
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                  className="text-sm px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                >
-                  {disconnecting ? "Disconnecting..." : "Disconnect"}
-                </button>
               </div>
             ) : (
               <div className="space-y-3">

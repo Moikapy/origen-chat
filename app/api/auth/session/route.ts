@@ -22,6 +22,26 @@ async function getEnv() {
 const OR_COOKIE = "or_session";
 const MAGIC_COOKIE = "magic_session";
 
+/** Get OpenRouter account info from the user's API key */
+async function getOpenRouterInfo(apiKey: string): Promise<{ balance: number; usage: number; usageMonthly: number; usageDaily: number; label: string } | null> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/auth/key", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { data?: { label?: string; usage?: number; usage_monthly?: number; usage_daily?: number; limit_remaining?: number } };
+    return {
+      balance: data.data?.limit_remaining ?? 0,
+      usage: data.data?.usage ?? 0,
+      usageMonthly: data.data?.usage_monthly ?? 0,
+      usageDaily: data.data?.usage_daily ?? 0,
+      label: data.data?.label ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Parse a specific cookie from the Cookie header */
 function getCookieValue(request: Request, name: string): string | null {
   const cookies = request.headers.get("cookie") ?? "";
@@ -59,6 +79,7 @@ export async function GET(request: Request) {
     // If decryption fails, the cookie is still present so we know
     // the user connected (just can't read the key server-side yet).
     let openrouterConnected = false;
+    let openrouterInfo: { balance: number; usage: number; usageMonthly: number; label: string } | null = null;
     const orCookie = getCookieValue(request, OR_COOKIE);
     if (orCookie) {
       // Cookie exists — user connected. Try to verify it's valid.
@@ -70,6 +91,10 @@ export async function GET(request: Request) {
               : undefined,
           });
           openrouterConnected = !!result.apiKey;
+          // If we have the decrypted key, fetch account info
+          if (result.apiKey) {
+            openrouterInfo = await getOpenRouterInfo(result.apiKey);
+          }
         } catch {
           // Decryption failed (key mismatch, expired, etc.)
           // But the cookie EXISTS, so treat as connected —
@@ -85,6 +110,7 @@ export async function GET(request: Request) {
     return Response.json({
       user,
       openrouterConnected,
+      openrouter: openrouterInfo,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Session check failed";

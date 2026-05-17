@@ -246,7 +246,7 @@ export function SessionSidebar({
   collapsed,
   loading,
 }: SessionSidebarProps) {
-  const { user, openrouterConnected, connectOpenRouter, disconnectOpenRouter } = useAuth();
+  const { user, openrouterConnected, openrouterInfo, connectOpenRouter, disconnectOpenRouter } = useAuth();
   const grouped = groupSessions(sessions);
 
   return (
@@ -304,7 +304,7 @@ export function SessionSidebar({
           )}
           {openrouterConnected && !user && (
             <p className="text-[11px] text-emerald-400 mt-1.5 px-0.5">
-              BYOK connected — all models on your key
+              BYOK connected{openrouterInfo ? ` · $${openrouterInfo.balance.toFixed(2)}` : ''}
             </p>
           )}
 
