@@ -265,31 +265,62 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Pro Upgrade (coming soon) */}
+        {/* Wallet & Billing */}
         <section className="mb-10">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
-            Pro Features
+            Wallet & Billing
           </h2>
-          <div className="bg-card border border-border rounded-lg p-6">
+          <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+            {/* Wallet Section */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Crypto Wallet</p>
+                <p className="text-sm text-muted-foreground">
+                  Connect MetaMask to pay with USDC on Base or launch tokens
+                </p>
+              </div>
+              <Link
+                href="/settings/wallet"
+                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Manage Wallet
+              </Link>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Pro Section */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Origen Pro</p>
-                <p className="text-sm text-muted-foreground">Coming soon</p>
+                <p className="text-sm text-muted-foreground">
+                  $5/month — 2,000 credits, premium models, unlimited memory
+                </p>
               </div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                Coming Soon
-              </span>
+              <Link
+                href="/settings/billing"
+                className="text-sm px-4 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Subscribe
+              </Link>
             </div>
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <p>Pro unlocks advanced features on top of BYOK:</p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Unlimited memory (no 50-fact cap)</li>
-                <li>Memory search across all conversations</li>
-                <li>Custom personas and system prompt templates</li>
-                <li>Image generation (DALL-E, Flux)</li>
-                <li>Priority response queue</li>
-                <li>Export conversations (Markdown, JSON)</li>
-              </ul>
+
+            <div className="border-t border-border" />
+
+            {/* Token Section */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Launch a Token</p>
+                <p className="text-sm text-muted-foreground">
+                  Create your own token on Base — earn ETH from trading fees
+                </p>
+              </div>
+              <Link
+                href="/token"
+                className="text-sm px-4 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors"
+              >
+                Launch
+              </Link>
             </div>
           </div>
         </section>

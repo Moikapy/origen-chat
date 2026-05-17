@@ -9,9 +9,11 @@
  */
 
 export { createWikipediaTool } from "./wikipedia";
+export { createWebSearchTool } from "./web-search";
 
 import type { OrigenTool } from "@moikapy/origen";
 import { createWikipediaTool } from "./wikipedia";
+import { createWebSearchTool } from "./web-search";
 
 /**
  * Build the full tool array for models that support tool use.
@@ -19,5 +21,8 @@ import { createWikipediaTool } from "./wikipedia";
  */
 export function createTools(supportsTools: boolean): OrigenTool[] {
   if (!supportsTools) return [];
-  return [createWikipediaTool()];
+  return [
+    createWikipediaTool(),
+    createWebSearchTool(),
+  ];
 }
