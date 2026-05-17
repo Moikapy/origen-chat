@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { SessionMessage } from "@/lib/session-store";
 import { ChatError } from "@/components/chat-error";
+import { WeatherCard } from "@/components/weather-card";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -184,11 +185,22 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
                     </div>
                   ))}
                 </div>
-                {tc.result && (
-                  <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 border border-border/50 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                    {tc.result}
-                  </div>
-                )}
+                {tc.result && (() => {
+                  // Render weather data with dedicated UI component
+                  if (tc.name === "get_weather") {
+                    try {
+                      const parsed = JSON.parse(tc.result);
+                      if (parsed.type === "current" || parsed.type === "forecast" || parsed.type === "hourly" || parsed.type === "alerts" || parsed.type === "needs_location") {
+                        return <WeatherCard data={tc.result} />;
+                      }
+                    } catch { /* not JSON, fall through */ }
+                  }
+                  return (
+                    <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 border border-border/50 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                      {tc.result}
+                    </div>
+                  );
+                })()}
               </div>
             </details>
           ))}
