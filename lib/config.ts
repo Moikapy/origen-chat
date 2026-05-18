@@ -1,4 +1,4 @@
-import { type ModelId, type AgentConfig, type D1Like, type MemoryProvider, type MemoryFact, type PeerProvider, type PeersConfig } from "@moikapy/origen";
+import { type ModelId, type AgentConfig, type D1Like, type MemoryProvider, type MemoryFact, type PeerProvider, type PeersConfig, type WikiProviderEntry, CloudWikiProvider } from "@moikapy/origen";
 import { modelSupportsTools } from "./models";
 import { createTools } from "./tools";
 
@@ -35,6 +35,31 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
   // No tool support: 1 step (single LLM call).
   const maxSteps = !supportsTools ? 1 : isFree ? 2 : 10;
 
+  // ── Wiki configuration (v2: named providers) ──────────────────────────
+  // Authenticated users get two wikis: a shared "canon" and a personal one
+  // isolated by their userId. Anonymous users get a single shared "wiki".
+  // Security by construction: each provider only sees its own data.
+  let wiki: WikiProviderEntry[] | undefined;
+  if (config.wiki && supportsTools && !isFree) {
+    const d1Provider = async () => {
+      const d1 = await getD1();
+      return d1 as any;
+    };
+
+    if (config.userId) {
+      // Authenticated user: canon (shared truths) + personal (user-isolated)
+      wiki = [
+        { name: "canon", description: "Core truths and verified knowledge. Read carefully.", provider: new CloudWikiProvider(d1Provider) },
+        { name: "personal", description: "Your private notes and observations. Only you can see this.", provider: new CloudWikiProvider(d1Provider, { where: "user_id = ?", whereParams: [config.userId] }) },
+      ];
+    } else {
+      // Anonymous user: single shared wiki
+      wiki = [
+        { name: "wiki", description: "Knowledge base", provider: new CloudWikiProvider(d1Provider) },
+      ];
+    }
+  }
+
   return {
     appName: "Origen Chat",
     systemPrompt: config.systemPrompt,
@@ -46,9 +71,7 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
       return undefined;
     },
     ollamaBaseUrl: config.ollamaBaseUrl,
-    // Wiki tools require D1 + multiple API calls. Skip for free models
-    // to avoid rate limiting. Premium users get the full wiki experience.
-    wiki: config.wiki && supportsTools && !isFree ? { type: "cloud" as const } : undefined,
+    wiki,
     memory: config.memory,
     peers: config.peerProvider ? {
       peerProvider: config.peerProvider,
@@ -58,8 +81,5 @@ export function buildAgentConfig(config: ChatConfig, getD1: () => Promise<unknow
       autoBuild: true,
     } satisfies PeersConfig : undefined,
     maxSteps,
-    // Note: response-healing plugin is now injected by default in @moikapy/origen
-    // for all OpenRouter models. No need to specify onPayload here unless
-    // you want additional payload modifications.
   };
 }
