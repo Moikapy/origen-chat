@@ -93,11 +93,13 @@ export async function GET(request: Request) {
 
       if (encryptKey) {
         try {
+          console.log(`[session] 🔍 Attempting decrypt: cookieLen=${orCookie.length} encryptKeyLen=${encryptKey.length} previousKeysLen=${env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.length ?? 0}`);
           const result = await decryptApiKey(orCookie, encryptKey, {
             previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS
               ? [env.OPENROUTER_ENCRYPT_KEY_PREVIOUS]
               : undefined,
           });
+          console.log(`[session] ✅ Decrypt result: apiKey=${result.apiKey ? `sk-or-v1-...${result.apiKey.slice(-8)}` : 'null'} isCurrentKey=${result.isCurrentKey}`);
           if (result.apiKey) {
             openrouterKeyValid = true;
             openrouterInfo = await getOpenRouterInfo(result.apiKey);
@@ -107,7 +109,9 @@ export async function GET(request: Request) {
           }
         } catch (err) {
           // Decryption failed — key was encrypted with a different ENCRYPT_KEY
-          console.warn(`[session] ⚠️ or_session cookie decrypt failed: ${err instanceof Error ? err.message : String(err)} — user needs to reconnect`);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[session] ❌ or_session decrypt failed: ${msg}`);
+          console.error(`[session] 📊 Cookie value (first 20): ${orCookie.substring(0, 20)}... (len=${orCookie.length})`);
         }
       }
       // If no encryptKey, we can't decrypt — leave openrouterKeyValid as false
