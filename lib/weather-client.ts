@@ -206,7 +206,7 @@ async function getObservationForStation(stationId: string): Promise<CurrentObser
       description: props.textDescription || "",
       icon: props.icon || "",
       windSpeed: props.windSpeed?.value != null
-        ? `${Math.round(props.windSpeed.value * 1.944)} mph`
+        ? `${Math.round(props.windSpeed.value * 0.621371)} mph` // km/h to mph
         : "N/A",
       windDirection: props.windDirection?.value != null
         ? degreeToDirection(props.windDirection.value)

@@ -159,7 +159,24 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
         </details>
       )}
 
-      {/* Tool calls */}
+      {/* Rich tool result cards — rendered PROMINENTLY above the collapsible tools */}
+      {message.toolCalls && message.toolCalls.some(tc => tc.name === "get_weather" && tc.result) && (
+        <div className="space-y-2 py-1">
+          {message.toolCalls
+            .filter(tc => tc.name === "get_weather" && tc.result)
+            .map((tc, i) => {
+              try {
+                const parsed = JSON.parse(tc.result!);
+                if (["current", "forecast", "hourly", "alerts", "needs_location"].includes(parsed.type)) {
+                  return <WeatherCard key={`wc-${i}`} data={tc.result!} />;
+                }
+              } catch { /* not renderable weather data */ }
+              return null;
+            })}
+        </div>
+      )}
+
+      {/* Tool calls — collapsible details */}
       {message.toolCalls && message.toolCalls.length > 0 && (
         <div className="space-y-1.5 py-1">
           {message.toolCalls.map((tc, i) => (
@@ -186,14 +203,14 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
                   ))}
                 </div>
                 {tc.result && (() => {
-                  // Render weather data with dedicated UI component
+                  // Don't re-render weather cards here — they're shown above
                   if (tc.name === "get_weather") {
                     try {
                       const parsed = JSON.parse(tc.result);
-                      if (parsed.type === "current" || parsed.type === "forecast" || parsed.type === "hourly" || parsed.type === "alerts" || parsed.type === "needs_location") {
-                        return <WeatherCard data={tc.result} />;
+                      if (["current", "forecast", "hourly", "alerts", "needs_location"].includes(parsed.type)) {
+                        return null;
                       }
-                    } catch { /* not JSON, fall through */ }
+                    } catch { /* fall through */ }
                   }
                   return (
                     <div className="text-xs text-muted-foreground bg-muted/20 rounded p-2 border border-border/50 whitespace-pre-wrap max-h-48 overflow-y-auto">
