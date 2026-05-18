@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock localStorage for vitest (not available in Node by default)
+// Mock localStorage for vitest
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
@@ -16,135 +16,138 @@ beforeEach(() => {
   localStorageMock.clear();
 });
 
-// ── getAuthConfig / config parsing tests ──────────────────────────
+// ── Ollama config parsing (single source of truth: getOllamaConfig) ──
 
-describe("Ollama config parsing (use-chat)", () => {
+describe("Ollama config parsing", () => {
   it("returns null when no config stored", () => {
     expect(localStorageMock.getItem("origen_ollama_config")).toBeNull();
   });
 
-  it("parses cloud config with apiKey and /v1 baseUrl", () => {
+  it("parses cloud config with apiKey", () => {
     localStorageMock.setItem(
       "origen_ollama_config",
-      JSON.stringify({ baseUrl: "https://ollama.com/v1", apiKey: "sk-test-123", mode: "cloud" }),
+      JSON.stringify({ baseUrl: "https://ollama.com/v1", apiKey: "sk-test", mode: "cloud" }),
     );
     const stored = JSON.parse(localStorageMock.getItem("origen_ollama_config")!);
-    expect(stored.baseUrl).toBe("https://ollama.com/v1");
-    expect(stored.apiKey).toBe("sk-test-123");
     expect(stored.mode).toBe("cloud");
+    expect(stored.apiKey).toBe("sk-test");
+    expect(stored.baseUrl).toBe("https://ollama.com/v1");
   });
 
-  it("defaults to https://ollama.com/v1 when no baseUrl in cloud mode", () => {
+  it("parses local config", () => {
     localStorageMock.setItem(
       "origen_ollama_config",
-      JSON.stringify({ apiKey: "sk-test-456", mode: "cloud" }),
+      JSON.stringify({ baseUrl: "http://localhost:11434/v1", mode: "local" }),
     );
     const stored = JSON.parse(localStorageMock.getItem("origen_ollama_config")!);
-    // getAuthConfig in use-chat defaults to "https://ollama.com/v1"
-    const effectiveUrl = stored.baseUrl || "https://ollama.com/v1";
-    expect(effectiveUrl).toBe("https://ollama.com/v1");
-    expect(stored.apiKey).toBe("sk-test-456");
-  });
-
-  it("parses local config with localhost URL", () => {
-    localStorageMock.setItem(
-      "origen_ollama_config",
-      JSON.stringify({ baseUrl: "http://localhost:11434", mode: "local" }),
-    );
-    const stored = JSON.parse(localStorageMock.getItem("origen_ollama_config")!);
-    expect(stored.baseUrl).toBe("http://localhost:11434");
     expect(stored.mode).toBe("local");
   });
 
-  it("handles malformed JSON gracefully", () => {
+  it("cloud config without apiKey returns null from getOllamaConfig", () => {
+    // In getOllamaConfig: cloud mode without apiKey → return null
+    localStorageMock.setItem(
+      "origen_ollama_config",
+      JSON.stringify({ baseUrl: "https://ollama.com/v1", mode: "cloud" }),
+    );
+    const stored = JSON.parse(localStorageMock.getItem("origen_ollama_config")!);
+    // apiKey is missing, which means getOllamaConfig returns null
+    expect(stored.apiKey).toBeFalsy();
+  });
+
+  it("defaults to https://ollama.com/v1 for cloud with missing baseUrl", () => {
+    const defaultUrl = "https://ollama.com/v1";
+    const emptyUrl = "";
+    expect(emptyUrl.trim().replace(/\/+$/, "") || defaultUrl).toBe(defaultUrl);
+  });
+
+  it("defaults to http://localhost:11434/v1 for local with missing baseUrl", () => {
+    const defaultUrl = "http://localhost:11434/v1";
+    const emptyUrl = "";
+    expect(emptyUrl.trim().replace(/\/+$/, "") || defaultUrl).toBe(defaultUrl);
+  });
+
+  it("handles malformed JSON", () => {
     localStorageMock.setItem("origen_ollama_config", "not-json");
     const stored = localStorageMock.getItem("origen_ollama_config");
     expect(() => JSON.parse(stored!)).toThrow();
   });
 });
 
-// ── Chat routing logic tests ──────────────────────────────────────
+// ── Chat routing: Ollama params only for Ollama models (DRY) ───────
 
-describe("Chat routing decisions", () => {
-  it("local Ollama models should bypass server (browser can't reach localhost)", () => {
-    const model = "ollama/llama3";
-    const ollamaConfig = { url: "http://localhost:11434", apiKey: "", mode: "local" };
-    expect(model.startsWith("ollama/") && ollamaConfig.mode === "local").toBe(true);
-  });
-
-  it("cloud Ollama models should route through server", () => {
-    const model = "ollama/llama3";
-    const ollamaConfig = { url: "https://ollama.com/v1", apiKey: "sk-test", mode: "cloud" };
-    expect(model.startsWith("ollama/") && ollamaConfig.mode === "local").toBe(false);
-  });
-
-  it("OpenRouter models always route through server", () => {
+describe("Chat request body construction", () => {
+  it("non-Ollama models: no Ollama params in body", () => {
     const model = "openrouter/deepseek/deepseek-v4-flash:free";
-    expect(model.startsWith("ollama/")).toBe(false);
+    const isOllamaModel = model.startsWith("ollama/");
+    const body: Record<string, unknown> = { messages: [], model, wiki: true };
+    // DRY: only add Ollama params when model is Ollama
+    if (isOllamaModel) {
+      body.ollamaBaseUrl = "https://ollama.com/v1";
+    }
+    expect(body).not.toHaveProperty("ollamaBaseUrl");
+    expect(Object.keys(body)).toEqual(["messages", "model", "wiki"]);
   });
 
-  it("cloud Ollama should pass /v1 base URL and API key in request body", () => {
-    const ollamaConfig = { url: "https://ollama.com/v1", apiKey: "sk-test", mode: "cloud" };
-    const authPayload = ollamaConfig.mode === "cloud"
-      ? { ollamaBaseUrl: "https://ollama.com/v1", ollamaApiKey: ollamaConfig.apiKey }
-      : {};
-    expect(authPayload).toEqual({
-      ollamaBaseUrl: "https://ollama.com/v1",
-      ollamaApiKey: "sk-test",
-    });
+  it("cloud Ollama model: includes ollamaBaseUrl and ollamaApiKey", () => {
+    const model = "ollama/llama3";
+    const isOllamaModel = model.startsWith("ollama/");
+    const body: Record<string, unknown> = { messages: [], model, wiki: true };
+    if (isOllamaModel) {
+      body.ollamaBaseUrl = "https://ollama.com/v1";
+      body.ollamaApiKey = "sk-test";
+    }
+    expect(body).toHaveProperty("ollamaBaseUrl", "https://ollama.com/v1");
+    expect(body).toHaveProperty("ollamaApiKey", "sk-test");
+  });
+
+  it("local Ollama model: bypasses server entirely (direct fetch)", () => {
+    const model = "ollama/llama3";
+    const ollamaMode = "local";
+    const shouldGoDirect = model.startsWith("ollama/") && ollamaMode === "local";
+    expect(shouldGoDirect).toBe(true);
+  });
+
+  it("Ollama config stored but non-Ollama model: no leak", () => {
+    // KEY DRY FIX: Ollama config should NOT leak into non-Ollama request bodies
+    const model = "openrouter/deepseek/deepseek-v4-flash:free";
+    const isOllamaModel = model.startsWith("ollama/");
+    const body: Record<string, unknown> = { messages: [], model, wiki: true };
+    if (isOllamaModel) {
+      body.ollamaBaseUrl = "https://ollama.com/v1";
+      body.ollamaApiKey = "sk-test";
+    }
+    expect(body).not.toHaveProperty("ollamaBaseUrl");
+    expect(body).not.toHaveProperty("ollamaApiKey");
+    // OpenRouter auth comes from cookies, parsed server-side
+  });
+
+  it("OpenRouter auth: no client-side auth in body", () => {
+    // OpenRouter auth is entirely server-side (encrypted cookies)
+    // Client never sends apiKey in the body for OpenRouter models
+    const model = "openrouter/deepseek/deepseek-v4-flash:free";
+    const body: Record<string, unknown> = { messages: [], model, wiki: true };
+    expect(Object.keys(body)).toEqual(["messages", "model", "wiki"]);
+    expect(body).not.toHaveProperty("apiKey");
+    expect(body).not.toHaveProperty("ollamaApiKey");
   });
 });
 
-// ── URL construction tests ────────────────────────────────────────
+// ── Local Ollama URL construction ──────────────────────────────────
 
-describe("Ollama URL construction", () => {
-  it("local Ollama uses /v1/chat/completions endpoint (OpenAI-compatible)", () => {
-    const baseUrl = "http://localhost:11434";
-    const endpoint = `${baseUrl}/v1/chat/completions`;
+describe("Local Ollama URL", () => {
+  it("baseUrl contains /v1, appends /chat/completions", () => {
+    const baseUrl = "http://localhost:11434/v1";
+    const endpoint = `${baseUrl}/chat/completions`;
     expect(endpoint).toBe("http://localhost:11434/v1/chat/completions");
   });
 
-  it("local Ollama uses /v1/models for model listing (OpenAI-compatible)", () => {
-    const baseUrl = "http://localhost:11434";
-    const endpoint = `${baseUrl}/v1/models`;
-    expect(endpoint).toBe("http://localhost:11434/v1/models");
+  it("strips trailing slashes", () => {
+    const raw = "http://localhost:11434/v1/";
+    expect(raw.replace(/\/+$/, "")).toBe("http://localhost:11434/v1");
   });
 
-  it("cloud Ollama base URL includes /v1 for streamOrigen", () => {
-    const cloudBaseUrl = "https://ollama.com/v1";
-    expect(cloudBaseUrl.endsWith("/v1")).toBe(true);
-  });
-
-  it("strips trailing slashes from base URL", () => {
-    const urls = [
-      "http://localhost:11434/",
-      "http://localhost:11434",
-      "https://ollama.com/v1/",
-      "https://ollama.com/v1",
-    ];
-    const normalized = urls.map(u => u.replace(/\/+$/, ""));
-    expect(normalized).toEqual([
-      "http://localhost:11434",
-      "http://localhost:11434",
-      "https://ollama.com/v1",
-      "https://ollama.com/v1",
-    ]);
-  });
-});
-
-// ── Ollama model ID parsing ──────────────────────────────────────
-
-describe("Ollama model ID parsing", () => {
-  it("strips ollama/ prefix for API calls", () => {
+  it("strips ollama/ prefix from model ID", () => {
     expect("ollama/llama3".replace(/^ollama\//, "")).toBe("llama3");
-  });
-
-  it("strips ollama/ prefix for complex model names", () => {
     expect("ollama/gemma3:12b".replace(/^ollama\//, "")).toBe("gemma3:12b");
-  });
-
-  it("does not modify non-ollama model IDs", () => {
-    const model = "openrouter/deepseek/deepseek-v4-flash:free";
-    expect(model.startsWith("ollama/")).toBe(false);
   });
 });

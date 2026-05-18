@@ -80,10 +80,9 @@ describe("Ollama model listing routing", () => {
   });
 
   it("local mode hits localhost directly (no CORS issue)", () => {
-    const mode = "local";
     const baseUrl = "http://localhost:11434/v1";
-    const endpoint = mode === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
-    expect(endpoint).toBe("http://localhost:11434/v1/models");
+    const getEndpoint = (m: string) => m === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
+    expect(getEndpoint("local")).toBe("http://localhost:11434/v1/models");
   });
 
   it("cloud proxy request body includes baseUrl and apiKey", () => {
@@ -192,10 +191,9 @@ describe("Ollama connection test routing", () => {
   });
 
   it("local test hits localhost directly", () => {
-    const mode = "local";
     const baseUrl = "http://localhost:11434/v1";
-    const endpoint = mode === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
-    expect(endpoint).toBe("http://localhost:11434/v1/models");
+    const getEndpoint = (m: string) => m === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
+    expect(getEndpoint("local")).toBe("http://localhost:11434/v1/models");
   });
 
   it("handles 401 response for invalid API key", () => {

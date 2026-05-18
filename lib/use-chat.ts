@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { SessionMessage } from "@/lib/session-store";
 
-// Client-safe StreamEvent type
+// ── Types ──────────────────────────────────────────────────────────
+
 export type StreamEvent =
   | { type: "reasoning"; content: string }
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
@@ -20,18 +21,48 @@ export interface ChatMessageInput {
 export interface UseChatConfig {
   model: string;
   systemPrompt?: string;
-  /** Called to append a new message to the session */
   appendMessage: (msg: SessionMessage, sessionId: string) => Promise<void>;
-  /** Called to update the last message in the session */
   updateLastMessage: (updates: Partial<SessionMessage>, sessionId: string) => Promise<void>;
-  /** Called to finalize the last message (mark streaming=false) */
   finalizeMessage: (updates: Partial<SessionMessage>, sessionId: string) => Promise<void>;
 }
 
-/**
- * Core chat hook — handles streaming AI responses with SSE parsing.
- * Extracted from page.tsx to decouple UI from AI call logic.
- */
+// ── Ollama config (single source of truth) ─────────────────────────
+
+const OLLAMA_STORAGE_KEY = "origen_ollama_config";
+
+export interface OllamaConfig {
+  baseUrl: string;
+  apiKey: string;
+  mode: "cloud" | "local";
+}
+
+/** Read Ollama config from localStorage. Returns null if not configured. */
+export function getOllamaConfig(): OllamaConfig | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem(OLLAMA_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    const config = JSON.parse(stored);
+    if (config.mode === "local") {
+      return {
+        baseUrl: (config.baseUrl || "http://localhost:11434/v1").replace(/\/+$/, ""),
+        apiKey: "",
+        mode: "local",
+      };
+    }
+    if (!config.apiKey) return null;
+    return {
+      baseUrl: (config.baseUrl || "https://ollama.com/v1").replace(/\/+$/, ""),
+      apiKey: config.apiKey,
+      mode: "cloud",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Chat hook ──────────────────────────────────────────────────────
+
 export function useChat(config: UseChatConfig) {
   const [streaming, setStreaming] = useState(false);
   const [streamElapsed, setStreamElapsed] = useState(0);
@@ -80,31 +111,34 @@ export function useChat(config: UseChatConfig) {
     const timeout = setTimeout(() => abort.abort(), 60_000);
 
     try {
-      const auth = getAuthConfig();
-      const ollamaConfig = getOllamaConfig();
+      const ollama = getOllamaConfig();
+      const isOllamaModel = config.model.startsWith("ollama/");
 
-      // Route local Ollama models directly from the browser.
-      // The server (Cloudflare Workers) can't reach localhost:11434.
-      // Cloud Ollama models go through /api/chat like everything else.
-      if (config.model.startsWith("ollama/") && ollamaConfig?.mode === "local") {
-        await sendToLocalOllama(messages, config.model, sessionId, abort, config, ollamaConfig);
+      // Local Ollama: browser calls ollama directly (server can't reach localhost)
+      if (isOllamaModel && ollama?.mode === "local") {
+        await sendToLocalOllama(messages, config.model, sessionId, abort, config, ollama);
         return;
       }
+
+      // Build request body — only include Ollama params for Ollama models
+      const body: Record<string, unknown> = {
+        messages,
+        model: config.model,
+        wiki: true,
+      };
+      if (config.systemPrompt) body.systemPrompt = config.systemPrompt;
+
+      if (isOllamaModel && ollama?.mode === "cloud") {
+        body.ollamaBaseUrl = "https://ollama.com/v1";
+        body.ollamaApiKey = ollama.apiKey;
+      }
+      // For non-Ollama models: no Ollama params needed.
+      // OpenRouter auth comes from encrypted cookies (server-side).
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages,
-          model: config.model,
-          wiki: true,
-          systemPrompt: config.systemPrompt || undefined,
-          // For cloud Ollama, pass the API key and base URL so the server routes correctly
-          ...(ollamaConfig?.mode === "cloud" ? {
-            ollamaBaseUrl: "https://ollama.com/v1",
-            ollamaApiKey: ollamaConfig.apiKey,
-          } : auth),
-        }),
+        body: JSON.stringify(body),
         signal: abort.signal,
       });
 
@@ -119,11 +153,9 @@ export function useChat(config: UseChatConfig) {
         return;
       }
 
-      // Parse SSE stream
       await parseSSEStream(res, sessionId, config.updateLastMessage, config.finalizeMessage);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        // User cancelled — leave whatever was streamed
         await config.finalizeMessage({ streaming: false }, sessionId);
       } else {
         await config.finalizeMessage({
@@ -152,15 +184,11 @@ export function useChat(config: UseChatConfig) {
     abortRef.current?.abort();
   }, []);
 
-  return {
-    streaming,
-    streamElapsed,
-    sendMessage,
-    stop,
-  };
+  return { streaming, streamElapsed, sendMessage, stop };
 }
 
-/** Parse an SSE stream from a fetch Response, calling callbacks for each event */
+// ── SSE parser ─────────────────────────────────────────────────────
+
 async function parseSSEStream(
   res: Response,
   sessionId: string,
@@ -223,7 +251,7 @@ async function parseSSEStream(
               streaming: false,
             }, sessionId);
             break;
-          case "error":
+          case "error": {
             const errorContent = currentContent
               ? `${currentContent}\n\n${event.message}`
               : event.message;
@@ -233,6 +261,7 @@ async function parseSSEStream(
               isError: true,
             }, sessionId);
             break;
+          }
         }
       } catch {
         /* skip malformed SSE */
@@ -241,66 +270,23 @@ async function parseSSEStream(
   }
 }
 
-/** Get auth config from localStorage (Ollama) — OpenRouter auth is via encrypted cookie */
-export function getAuthConfig(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const stored = localStorage.getItem("origen_ollama_config");
-  if (!stored) return {};
-  try {
-    const config = JSON.parse(stored);
-    if (config.apiKey || config.baseUrl) return { ollamaBaseUrl: config.baseUrl || "https://ollama.com/v1", ollamaApiKey: config.apiKey || "" };
-    return {};
-  } catch {
-    return {};
-  }
-}
+// ── Local Ollama sender ────────────────────────────────────────────
 
-/** Get Ollama config (URL + API key + mode) from localStorage */
-export function getOllamaConfig(): { url: string; apiKey: string; mode: string } | null {
-  if (typeof window === "undefined") return null;
-  const stored = localStorage.getItem("origen_ollama_config");
-  if (!stored) return null;
-  try {
-    const config = JSON.parse(stored);
-    // Cloud mode requires API key; local mode works without
-    if (config.mode === "local") {
-      const baseUrl = (config.baseUrl || "http://localhost:11434").replace(/\/+$/, "");
-      return { url: baseUrl, apiKey: "", mode: "local" };
-    }
-    if (!config.apiKey) return null;
-    return {
-      url: (config.baseUrl || "https://ollama.com/v1").replace(/\/+$/, ""),
-      apiKey: config.apiKey,
-      mode: "cloud",
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** Send messages to local Ollama directly from the browser.
- *  Uses the OpenAI-compatible /v1/chat/completions endpoint with SSE streaming
- *  so the response format matches what parseSSEStream expects.
- *  Cloud Ollama routes through /api/chat (handled server-side by streamOrigen).
- */
 async function sendToLocalOllama(
   messages: ChatMessageInput[],
   model: string,
   sessionId: string,
   abort: AbortController,
   config: UseChatConfig,
-  ollamaConfig: { url: string; apiKey: string },
+  ollama: OllamaConfig,
 ): Promise<void> {
-  // Strip ollama/ prefix to get the model name Ollama expects
   const ollamaModel = model.replace(/^ollama\//, "");
-  const baseUrl = ollamaConfig.url.replace(/\/+$/, "");
+  const baseUrl = ollama.baseUrl.replace(/\/+$/, "");
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (ollamaConfig.apiKey) {
-    headers["Authorization"] = `Bearer ${ollamaConfig.apiKey}`;
-  }
+  if (ollama.apiKey) headers["Authorization"] = `Bearer ${ollama.apiKey}`;
 
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -324,6 +310,5 @@ async function sendToLocalOllama(
     return;
   }
 
-  // Parse the SSE stream — OpenAI-compatible format yields the same events as /api/chat
   await parseSSEStream(res, sessionId, config.updateLastMessage, config.finalizeMessage);
 }

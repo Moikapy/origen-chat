@@ -9,7 +9,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { ChatMessage } from "@/components/chat-message";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { useSessions } from "@/lib/use-sessions";
-import { useChat, getAuthConfig, type ChatMessageInput } from "@/lib/use-chat";
+import { useChat, type ChatMessageInput } from "@/lib/use-chat";
 import type { SessionMessage } from "@/lib/session-store";
 import { useAuth } from "@/lib/auth";
 import { ModelSelector } from "@/components/model-selector";
