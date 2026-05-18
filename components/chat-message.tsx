@@ -160,11 +160,24 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
       )}
 
       {/* Rich tool result cards — rendered PROMINENTLY above the collapsible tools */}
-      {message.toolCalls && message.toolCalls.some(tc => tc.name === "get_weather" && tc.result) && (
-        <div className="space-y-2 py-1">
-          {message.toolCalls
-            .filter(tc => tc.name === "get_weather" && tc.result)
-            .map((tc, i) => {
+      {/* Show only the LAST weather card of each type to avoid duplicates from multiple tool calls */}
+      {message.toolCalls && message.toolCalls.some(tc => tc.name === "get_weather" && tc.result) && (() => {
+        const weatherCalls = message.toolCalls.filter(tc => tc.name === "get_weather" && tc.result);
+        // Deduplicate: keep only the last call of each type
+        const seen = new Set<string>();
+        const unique: typeof weatherCalls = [];
+        for (let i = weatherCalls.length - 1; i >= 0; i--) {
+          try {
+            const parsed = JSON.parse(weatherCalls[i].result!);
+            if (!seen.has(parsed.type)) {
+              seen.add(parsed.type);
+              unique.unshift(weatherCalls[i]);
+            }
+          } catch { /* skip unparseable */ }
+        }
+        return unique.length > 0 ? (
+          <div className="space-y-2 py-1">
+            {unique.map((tc, i) => {
               try {
                 const parsed = JSON.parse(tc.result!);
                 if (["current", "forecast", "hourly", "alerts", "needs_location"].includes(parsed.type)) {
@@ -173,8 +186,9 @@ export function ChatMessage({ message, onEdit, onRegenerate, index, streaming }:
               } catch { /* not renderable weather data */ }
               return null;
             })}
-        </div>
-      )}
+          </div>
+        ) : null;
+      })()}
 
       {/* Tool calls — collapsible details */}
       {message.toolCalls && message.toolCalls.length > 0 && (

@@ -55,13 +55,13 @@ export function middleware(request: NextRequest) {
     // In production, we could use nonces, but that requires significant refactoring
     `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
     // Styles: Next.js injects inline styles
-    `style-src 'self' 'unsafe-inline'`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     // Images: Allow data: URIs and any https source (model providers, avatars)
     `img-src 'self' data: https: blob:`,
     // Fonts: Allow self-hosted and data: URIs
-    `font-src 'self' data:`,
-    // Connections: API calls, SSE, and WebSocket for dev server
-    `connect-src 'self' https://openrouter.ai https://*.moikapy.dev ${isDev ? "ws://localhost:*" : ""}`,
+    `font-src 'self' data: https://fonts.gstatic.com`,
+    // Connections: API calls, SSE, Ollama cloud, and WebSocket for dev server
+    `connect-src 'self' https://openrouter.ai https://*.moikapy.dev https://ollama.com https://api.weather.gov https://nominatim.openstreetmap.org ${isDev ? "ws://localhost:* http://localhost:*" : ""}`,
     // Media: Allow audio/video from https sources
     `media-src 'self' https:`,
     // Objects: No Flash/Java plugins

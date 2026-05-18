@@ -75,7 +75,7 @@ export default function LoginPage() {
       }
 
       // Get nonce
-      const { nonce } = await fetch("/api/auth/wallet/nonce").then(r => r.json() as Promise<{ nonce: string }>);
+      const { nonce } = await fetch("/api/auth/wallet").then(r => r.json() as Promise<{ nonce: string }>);
 
       // Create and sign SIWE message
       const { createSiweMessage } = await import("@/lib/wallet");

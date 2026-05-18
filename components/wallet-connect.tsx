@@ -41,7 +41,7 @@ export function WalletConnect({ onConnected, onError, className }: WalletConnect
       }
 
       // SIWE sign-in
-      const { nonce } = await fetch("/api/auth/wallet/nonce").then(r => r.json() as Promise<{ nonce: string }>);
+      const { nonce } = await fetch("/api/auth/wallet").then(r => r.json() as Promise<{ nonce: string }>);
       const domain = window.location.host;
       const message = createSiweMessage({ domain, address: walletAddress, chainId, nonce });
       const signature = await window.ethereum.request({ method: "personal_sign", params: [message, walletAddress] }) as string;
