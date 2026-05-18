@@ -137,17 +137,27 @@ async function handleChatRequest(request: Request): Promise<Response> {
         encryptKey: env.OPENROUTER_ENCRYPT_KEY,
         previousKeys: env.OPENROUTER_ENCRYPT_KEY_PREVIOUS?.split(","),
       });
+      // Log successful decrypt for debugging
+      if (cookieApiKey) {
+        console.log(`[chat] ✅ OpenRouter key decrypted from cookie (len=${cookieApiKey.length})`);
+      }
     }
     // ADR-007: Check if or_session cookie exists even if decrypt failed
-    // Cookie presence proves user connected — fall back to server key for free models
     const cookieHeader = request.headers.get("cookie") || "";
     hasOrSession = cookieHeader.includes("or_session=");
-  } catch {
+    // Log when cookie exists but key decrypt failed — this is the bug path
+    if (hasOrSession && !cookieApiKey) {
+      console.warn(`[chat] ⚠️ or_session cookie exists but decrypt returned null — key is stale. User needs to reconnect OpenRouter in Settings.`);
+    }
+  } catch (err) {
     // Cookie decryption failed or cookies() unavailable
-    // ADR-007: Still check for cookie presence
+    console.error(`[chat] ❌ Cookie decrypt error: ${err instanceof Error ? err.message : String(err)}`);
     try {
       const cookieHeader = request.headers.get("cookie") || "";
       hasOrSession = cookieHeader.includes("or_session=");
+      if (hasOrSession) {
+        console.warn(`[chat] ⚠️ or_session cookie exists but decrypt threw — key stale or corrupt`);
+      }
     } catch { /* no cookies available */ }
   }
 
@@ -209,11 +219,11 @@ async function handleChatRequest(request: Request): Promise<Response> {
     provider = "openrouter";
     apiKey = serverFreeKey;
   } else if (isConnected) {
-    // User is connected (has cookie) but no decrypted key and no server free key
-    // This means they're trying a premium model with a broken cookie
+    // User is connected (has cookie) but no decrypted key and no server free key.
+    // Their cookie is stale — they need to reconnect.
     return new Response(
       JSON.stringify({
-        error: "Your OpenRouter key couldn't be read. Try reconnecting in Settings, or use a free model.",
+        error: "Your OpenRouter key couldn't be read. Please reconnect in Settings to continue using premium models.",
       }),
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
