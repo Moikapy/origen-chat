@@ -7,7 +7,7 @@ import { useOllama } from "@/lib/use-ollama";
 import Link from "next/link";
 
 export default function SettingsPage() {
-  const { user, loading, openrouterConnected, openrouterInfo, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
+  const { user, loading, openrouterConnected, openrouterKeyValid, openrouterInfo, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
   const { facts } = useMemory();
   const [disconnecting, setDisconnecting] = useState(false);
   const [manualKey, setManualKey] = useState("");
@@ -140,18 +140,27 @@ export default function SettingsPage() {
                   <p className="font-medium">OpenRouter</p>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      openrouterConnected
+                      openrouterKeyValid
                         ? "bg-green-500/20 text-green-400"
-                        : "bg-muted text-muted-foreground"
+                        : openrouterConnected
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {openrouterConnected ? "Connected" : "Not connected"}
+                    {openrouterKeyValid ? "Connected" : openrouterConnected ? "Stale key" : "Not connected"}
                   </span>
                 </div>
+                {openrouterConnected && !openrouterKeyValid && (
+                  <div className="mt-2 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm">
+                    <strong>⚠️ Key needs refresh</strong> — Your OpenRouter key can't be read. Please reconnect to continue using premium models.
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">
-                  {openrouterConnected
+                  {openrouterKeyValid
                     ? "Your OpenRouter API key is encrypted and stored securely. Use any model on your own key."
-                    : "Connect your OpenRouter account to use any model — free and premium — on your own key."}
+                    : openrouterConnected
+                      ? "Your OpenRouter session is stale. Reconnect to refresh your key."
+                      : "Connect your OpenRouter account to use any model — free and premium — on your own key."}
                 </p>
               </div>
             </div>

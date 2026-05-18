@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { ModelSelector } from "@/components/model-selector";
 
 function ChatPageInner() {
-  const { user, openrouterConnected } = useAuth();
+  const { user, openrouterConnected, openrouterKeyValid } = useAuth();
   const {
     sessions,
     activeId,

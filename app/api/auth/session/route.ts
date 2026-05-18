@@ -3,6 +3,10 @@
  *
  * Combines the magic-link auth status with the OpenRouter BYOK status
  * so the client knows both: who the user is AND whether they have a key.
+ *
+ * Returns `openrouterKeyValid` to distinguish between:
+ * - "connected and key works" (true) — everything works
+ * - "connected but key is stale/can't decrypt" (false) — show reconnect prompt
  */
 import { decryptApiKey } from "@moikapy/openrouter-auth/crypto";
 import { sanitizeError } from "@/lib/sanitize-error";
@@ -75,15 +79,18 @@ export async function GET(request: Request) {
     }
 
     // Check OpenRouter connection
-    // Strategy: Check if the or_session cookie exists and is non-empty.
-    // Try to decrypt it with the encrypt key if available.
-    // If decryption fails, the cookie is still present so we know
-    // the user connected (just can't read the key server-side yet).
+    // Three states:
+    // 1. No cookie → not connected (openrouterConnected: false)
+    // 2. Cookie exists, decrypt works → connected and valid (openrouterConnected: true, openrouterKeyValid: true)
+    // 3. Cookie exists, decrypt fails → connected but stale (openrouterConnected: true, openrouterKeyValid: false)
     let openrouterConnected = false;
-    let openrouterInfo: { balance: number; usage: number; usageMonthly: number; label: string } | null = null;
+    let openrouterKeyValid = false;
+    let openrouterInfo: { balance: number; usage: number; usageMonthly: number; usageDaily: number; label: string } | null = null;
     const orCookie = getCookieValue(request, OR_COOKIE);
+
     if (orCookie) {
-      // Cookie exists — user connected. Try to verify it's valid.
+      openrouterConnected = true; // Cookie exists = user connected at some point
+
       if (encryptKey) {
         try {
           const result = await decryptApiKey(orCookie, encryptKey, {
@@ -91,30 +98,30 @@ export async function GET(request: Request) {
               ? [env.OPENROUTER_ENCRYPT_KEY_PREVIOUS]
               : undefined,
           });
-          openrouterConnected = !!result.apiKey;
-          // If we have the decrypted key, fetch account info
           if (result.apiKey) {
+            openrouterKeyValid = true;
             openrouterInfo = await getOpenRouterInfo(result.apiKey);
+          } else {
+            // Decryption succeeded but no key extracted — stale session
+            console.warn("[session] ⚠️ or_session cookie decrypted but no apiKey extracted — stale session");
           }
-        } catch {
-          // Decryption failed (key mismatch, expired, etc.)
-          // But the cookie EXISTS, so treat as connected —
-          // the chat route will try to decrypt again with its own key resolution
-          openrouterConnected = true;
+        } catch (err) {
+          // Decryption failed — key was encrypted with a different ENCRYPT_KEY
+          console.warn(`[session] ⚠️ or_session cookie decrypt failed: ${err instanceof Error ? err.message : String(err)} — user needs to reconnect`);
         }
-      } else {
-        // No encrypt key available, but cookie exists
-        openrouterConnected = true;
       }
+      // If no encryptKey, we can't decrypt — leave openrouterKeyValid as false
+      // The UI should prompt the user to reconnect
     }
 
     return Response.json({
       user,
       openrouterConnected,
+      openrouterKeyValid,
       openrouter: openrouterInfo,
     });
   } catch (err) {
     const { message } = sanitizeError(err, "auth/session");
-    return Response.json({ user: null, openrouterConnected: false }, { status: 200 });
+    return Response.json({ user: null, openrouterConnected: false, openrouterKeyValid: false }, { status: 200 });
   }
 }

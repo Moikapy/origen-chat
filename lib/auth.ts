@@ -13,6 +13,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   openrouterConnected: boolean;
+  openrouterKeyValid: boolean;
   openrouterInfo: { balance: number; usage: number; usageMonthly: number; usageDaily: number; label: string } | null;
   connectOpenRouter: () => void;
   disconnectOpenRouter: () => Promise<void>;
@@ -22,6 +23,7 @@ interface AuthState {
 export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
   const [openrouterConnected, setOpenrouterConnected] = useState(false);
+  const [openrouterKeyValid, setOpenrouterKeyValid] = useState(false);
   const [openrouterInfo, setOpenrouterInfo] = useState<{ balance: number; usage: number; usageMonthly: number; usageDaily: number; label: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,11 +31,12 @@ export function useAuth(): AuthState {
     let cancelled = false;
 
     fetch("/api/auth/session")
-      .then((r) => r.json() as Promise<{ user: User | null; openrouterConnected: boolean; openrouter?: { balance: number; usage: number; usageMonthly: number; usageDaily?: number; usage_daily?: number; label: string } | null }>)
+      .then((r) => r.json() as Promise<{ user: User | null; openrouterConnected: boolean; openrouterKeyValid: boolean; openrouter?: { balance: number; usage: number; usageMonthly: number; usageDaily?: number; usage_daily?: number; label: string } | null }>)
       .then((data) => {
         if (!cancelled) {
           if (data.user) setUser(data.user);
           setOpenrouterConnected(data.openrouterConnected ?? false);
+          setOpenrouterKeyValid(data.openrouterKeyValid ?? false);
           setOpenrouterInfo(data.openrouter ? { ...data.openrouter, usageDaily: data.openrouter.usageDaily ?? data.openrouter.usage_daily ?? 0 } : null);
         }
       })
@@ -72,6 +75,7 @@ export function useAuth(): AuthState {
     user,
     loading,
     openrouterConnected,
+    openrouterKeyValid,
     openrouterInfo,
     connectOpenRouter,
     disconnectOpenRouter,
