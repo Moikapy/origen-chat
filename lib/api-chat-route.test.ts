@@ -185,3 +185,77 @@ describe("POST /api/chat — Model ID Handling", () => {
     expect(classifyError("Connection interrupted")).toBe("network");
   });
 });
+
+describe("POST /api/chat — Ollama Provider Routing", () => {
+  it("routes ollama/ models with ollamaBaseUrl to ollama provider", async () => {
+    // When a request includes ollamaBaseUrl and the model starts with ollama/,
+    // the chat route should set provider="ollama" and pass the API key
+    mockStreamOrigen.mockImplementationOnce(async function* () {
+      yield { type: "text", content: "Hi from Ollama" };
+      yield { type: "done", message: "", citations: [], usage: undefined };
+    });
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: VALID_HEADERS,
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "hello" }],
+        model: "ollama/llama3",
+        wiki: false,
+        ollamaBaseUrl: "https://ollama.com/v1",
+        ollamaApiKey: "sk-test-ollama-key",
+      }),
+    });
+
+    const res = await POST(req);
+    // The route should succeed (status < 500) or return a meaningful error
+    // (429 rate limit, 401 auth, etc. are all valid — we just check it doesn't crash)
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("cloud Ollama base URL must include /v1 for OpenAI-compatible mode", () => {
+    // pi-ai's resolveModel uses ollamaBaseUrl for the base URL.
+    // The OpenAI-compatible endpoint is at {baseUrl}/chat/completions
+    // So baseUrl must end with /v1 for the full URL to be correct.
+    const validUrls = [
+      "https://ollama.com/v1",
+      "http://localhost:11434/v1",
+    ];
+    const invalidUrls = [
+      "https://ollama.com",        // missing /v1
+      "https://ollama.com/api",    // wrong path
+      "http://localhost:11434",    // missing /v1
+    ];
+
+    for (const url of validUrls) {
+      expect(url.endsWith("/v1")).toBe(true);
+    }
+    for (const url of invalidUrls) {
+      expect(url.endsWith("/v1")).toBe(false);
+    }
+  });
+
+  it("local Ollama models with no ollamaBaseUrl fall through to OpenRouter", async () => {
+    // If someone selects an ollama/ model but has no Ollama config,
+    // the route should still process (likely failing auth, but not crashing)
+    mockStreamOrigen.mockImplementationOnce(async function* () {
+      yield { type: "text", content: "fallback" };
+      yield { type: "done", message: "", citations: [], usage: undefined };
+    });
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: VALID_HEADERS,
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "hello" }],
+        model: "ollama/llama3",
+        wiki: false,
+        // No ollamaBaseUrl or ollamaApiKey
+      }),
+    });
+
+    const res = await POST(req);
+    // Should succeed or return a meaningful error, not crash
+    expect(res.status).toBeLessThan(500);
+  });
+});

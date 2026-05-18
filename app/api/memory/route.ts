@@ -19,7 +19,15 @@ async function authenticate(request: Request): Promise<{ userId: string; env: an
   if (!sessionId) return null;
 
   const env = await getEnv();
-  if (!env.DB) return null;
+  if (!env.DB) {
+    console.error("[memory] DB binding missing — check wrangler.toml D1 config");
+    return null;
+  }
+
+  if (!env.OPENROUTER_ENCRYPT_KEY) {
+    console.error("[memory] OPENROUTER_ENCRYPT_KEY missing — set via: wrangler secret put OPENROUTER_ENCRYPT_KEY");
+    return null;
+  }
 
   const { getSession } = await import("@moikapy/magic-link");
   const result = await getSession(sessionId, {

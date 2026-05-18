@@ -1,8 +1,8 @@
 /**
  * Ollama integration hook — supports cloud API (api key) and local instance.
  *
- * Cloud: https://ollama.com with Bearer token
- * Local: http://localhost:11434 (no auth, but may have CORS issues from browser)
+ * Cloud models route through /api/chat server-side (streamOrigen handles routing).
+ * Local models go directly from browser to localhost:11434 (OpenAI-compatible /v1).
  */
 import { useState, useEffect, useCallback } from "react";
 
@@ -16,7 +16,7 @@ export interface OllamaModel {
 }
 
 const STORAGE_KEY = "origen_ollama_config";
-const CLOUD_URL = "https://ollama.com";
+const CLOUD_URL = "https://ollama.com/v1";
 
 export interface OllamaConfig {
   baseUrl: string;
@@ -47,7 +47,7 @@ export function useOllama() {
     }
   }, []);
 
-  // Fetch models when config is set
+  // Fetch models using the OpenAI-compatible /v1/models endpoint
   const refreshModels = useCallback(async (configKey?: string, configUrl?: string, configMode?: "cloud" | "local") => {
     const key = configKey || apiKey;
     const baseUrl = (configUrl || url || CLOUD_URL).replace(/\/+$/, "");
@@ -60,33 +60,29 @@ export function useOllama() {
     }
 
     setLoading(true);
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-    // Cloud mode: proxy through our API to avoid CORS issues
-    // Local mode: call Ollama directly (requires OLLAMA_ORIGINS=*)
-    const fetchUrl = m === "cloud"
-      ? "/api/ollama-proxy"
-      : `${baseUrl}/api/tags`;
-    const fetchBody = m === "cloud"
-      ? JSON.stringify({ path: "/api/tags", method: "GET", apiKey: key })
-      : undefined;
+    const headers: Record<string, string> = {};
     if (key) headers["Authorization"] = `Bearer ${key}`;
 
     try {
-      const res = await fetch(fetchUrl, {
-        method: m === "cloud" ? "POST" : "GET",
+      // Use /v1/models (OpenAI-compatible) for both cloud and local
+      const res = await fetch(`${baseUrl}/models`, {
         headers,
-        body: fetchBody,
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { models?: Array<{ name: string; size: number; modified_at: string }> };
-      const ollamaModels = (data.models || []).map((m) => ({
+      const data = await res.json() as { data?: Array<{ id: string }>; models?: Array<{ name: string; size: number; modified_at: string }> };
+
+      // Handle both OpenAI-compatible format ({ data: [...] }) and native Ollama format ({ models: [...] })
+      const ollamaModels = (data.models || (data.data || []).map(d => ({
+        name: d.id,
+        size: 0,
+        modified_at: "",
+      }))).map((m) => ({
         name: m.name,
         id: `ollama/${m.name}`,
         size: m.size,
         modified: m.modified_at,
-        sizeLabel: formatBytes(m.size),
+        sizeLabel: m.size ? formatBytes(m.size) : "",
       }));
       setModels(ollamaModels);
       setConnected(true);
@@ -109,7 +105,7 @@ export function useOllama() {
 
   /** Save Ollama config to localStorage */
   const saveConfig = useCallback((newUrl: string, newApiKey: string, newMode: "cloud" | "local") => {
-    const trimmedUrl = newUrl.trim().replace(/\/+$/, "") || (newMode === "local" ? "http://localhost:11434" : CLOUD_URL);
+    const trimmedUrl = newUrl.trim().replace(/\/+$/, "") || (newMode === "local" ? "http://localhost:11434/v1" : CLOUD_URL);
     const trimmedKey = newApiKey.trim();
 
     const config: OllamaConfig = { baseUrl: trimmedUrl, apiKey: trimmedKey, mode: newMode };
@@ -134,22 +130,26 @@ export function useOllama() {
   const testConnection = useCallback(async (testUrl?: string, testKey?: string): Promise<{ ok: boolean; error?: string; models?: OllamaModel[] }> => {
     const baseUrl = (testUrl || url || CLOUD_URL).replace(/\/+$/, "");
     const key = testKey || apiKey;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const headers: Record<string, string> = {};
     if (key) headers["Authorization"] = `Bearer ${key}`;
 
     try {
-      const res = await fetch(`${baseUrl}/api/tags`, {
+      const res = await fetch(`${baseUrl}/models`, {
         headers,
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
-        const data = await res.json() as { models?: Array<{ name: string; size: number; modified_at: string }> };
-        const found = (data.models || []).map((m) => ({
+        const data = await res.json() as { data?: Array<{ id: string }>; models?: Array<{ name: string; size: number; modified_at: string }> };
+        const found = (data.models || (data.data || []).map(d => ({
+          name: d.id,
+          size: 0,
+          modified_at: "",
+        }))).map((m) => ({
           name: m.name,
           id: `ollama/${m.name}` as const,
           size: m.size,
           modified: m.modified_at,
-          sizeLabel: formatBytes(m.size),
+          sizeLabel: m.size ? formatBytes(m.size) : "",
         }));
         return { ok: true, models: found };
       }
