@@ -293,20 +293,44 @@ async function sendToOllama(
   const ollamaModel = model.replace(/^ollama\//, "");
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (ollamaConfig.apiKey) {
-    headers["Authorization"] = `Bearer ${ollamaConfig.apiKey}`;
-  }
 
-  const res = await fetch(`${ollamaConfig.url}/api/chat`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
+  // Cloud mode: proxy through our server to avoid CORS
+  // Local mode: call Ollama directly (requires OLLAMA_ORIGINS=*)
+  let fetchUrl: string;
+  let fetchBody: string;
+
+  if (ollamaConfig.mode === "cloud") {
+    fetchUrl = "/api/ollama-proxy";
+    fetchBody = JSON.stringify({
+      path: "/api/chat",
+      method: "POST",
+      apiKey: ollamaConfig.apiKey,
+      body: {
+        model: ollamaModel,
+        messages: config.systemPrompt
+          ? [{ role: "system", content: config.systemPrompt }, ...messages]
+          : messages,
+        stream: true,
+      },
+    });
+  } else {
+    fetchUrl = `${ollamaConfig.url}/api/chat`;
+    if (ollamaConfig.apiKey) {
+      headers["Authorization"] = `Bearer ${ollamaConfig.apiKey}`;
+    }
+    fetchBody = JSON.stringify({
       model: ollamaModel,
       messages: config.systemPrompt
         ? [{ role: "system", content: config.systemPrompt }, ...messages]
         : messages,
       stream: true,
-    }),
+    });
+  }
+
+  const res = await fetch(fetchUrl, {
+    method: "POST",
+    headers,
+    body: fetchBody,
     signal: abort.signal,
   });
 

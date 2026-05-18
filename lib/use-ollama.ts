@@ -61,11 +61,22 @@ export function useOllama() {
 
     setLoading(true);
     const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+    // Cloud mode: proxy through our API to avoid CORS issues
+    // Local mode: call Ollama directly (requires OLLAMA_ORIGINS=*)
+    const fetchUrl = m === "cloud"
+      ? "/api/ollama-proxy"
+      : `${baseUrl}/api/tags`;
+    const fetchBody = m === "cloud"
+      ? JSON.stringify({ path: "/api/tags", method: "GET", apiKey: key })
+      : undefined;
     if (key) headers["Authorization"] = `Bearer ${key}`;
 
     try {
-      const res = await fetch(`${baseUrl}/api/tags`, {
+      const res = await fetch(fetchUrl, {
+        method: m === "cloud" ? "POST" : "GET",
         headers,
+        body: fetchBody,
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

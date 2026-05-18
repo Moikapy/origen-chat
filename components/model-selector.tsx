@@ -209,7 +209,7 @@ export function ModelSelector({
 
       {/* Command palette popover */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-72 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute bottom-full left-0 right-0 mb-2 sm:left-0 sm:right-auto sm:w-72 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-border">
             <input
