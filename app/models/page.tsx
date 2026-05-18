@@ -310,7 +310,7 @@ export default function ModelsPage() {
     <div className="min-h-screen bg-background text-foreground">
       <SiteNav active="models" />
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Models</h1>

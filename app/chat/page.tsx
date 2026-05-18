@@ -239,7 +239,7 @@ function ChatPageInner() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="border-b border-border px-4 py-3">
+        <header className="border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="mx-auto max-w-3xl flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
@@ -269,7 +269,7 @@ function ChatPageInner() {
         </header>
 
         {/* Messages */}
-        <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
+        <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6">
           <div className="mx-auto max-w-3xl space-y-6 pb-4">
             {messages.length === 0 && !activeId && (
               <div className="text-center text-muted-foreground py-16">
@@ -330,7 +330,7 @@ function ChatPageInner() {
         )}
 
         {/* Input */}
-        <footer className="border-t border-border px-4 pb-5 pt-3">
+        <footer className="border-t border-border px-3 sm:px-4 pb-4 sm:pb-5 pt-2 sm:pt-3">
           <div className="mx-auto max-w-3xl">
             <div
               className="border border-border rounded-xl bg-card p-3 pt-2 focus-within:ring-2 focus-within:ring-ring"
