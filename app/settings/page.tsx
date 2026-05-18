@@ -7,7 +7,7 @@ import { useOllama } from "@/lib/use-ollama";
 import Link from "next/link";
 
 export default function SettingsPage() {
-  const { user, loading, openrouterConnected, openrouterKeyValid, openrouterInfo, connectOpenRouter, disconnectOpenRouter, logout } = useAuth();
+  const { user, loading, openrouterConnected, openrouterKeyValid, openrouterInfo, connectOpenRouter, disconnectOpenRouter, logout, refreshSession } = useAuth();
   const { facts } = useMemory();
   const [disconnecting, setDisconnecting] = useState(false);
   const [manualKey, setManualKey] = useState("");
@@ -34,6 +34,7 @@ export default function SettingsPage() {
     } finally {
       setDisconnecting(false);
     }
+    refreshSession();
   };
 
   const handleManualKey = async () => {
@@ -53,8 +54,8 @@ export default function SettingsPage() {
       }
       setManualKey("");
       setKeySuccess(true);
-      // Refresh auth state
-      window.location.reload();
+      // Refresh auth state without full page reload
+      refreshSession();
     } catch (err) {
       setKeyError(err instanceof Error ? err.message : "Failed to save key");
     } finally {

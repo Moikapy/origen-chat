@@ -18,6 +18,7 @@ interface AuthState {
   connectOpenRouter: () => void;
   disconnectOpenRouter: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshSession: () => void;
 }
 
 export function useAuth(): AuthState {
@@ -27,28 +28,22 @@ export function useAuth(): AuthState {
   const [openrouterInfo, setOpenrouterInfo] = useState<{ balance: number; usage: number; usageMonthly: number; usageDaily: number; label: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/auth/session")
+  const fetchSession = useCallback(() => {
+    return fetch("/api/auth/session")
       .then((r) => r.json() as Promise<{ user: User | null; openrouterConnected: boolean; openrouterKeyValid: boolean; openrouter?: { balance: number; usage: number; usageMonthly: number; usageDaily?: number; usage_daily?: number; label: string } | null }>)
       .then((data) => {
-        if (!cancelled) {
-          if (data.user) setUser(data.user);
-          setOpenrouterConnected(data.openrouterConnected ?? false);
-          setOpenrouterKeyValid(data.openrouterKeyValid ?? false);
-          setOpenrouterInfo(data.openrouter ? { ...data.openrouter, usageDaily: data.openrouter.usageDaily ?? data.openrouter.usage_daily ?? 0 } : null);
-        }
+        if (data.user) setUser(data.user);
+        setOpenrouterConnected(data.openrouterConnected ?? false);
+        setOpenrouterKeyValid(data.openrouterKeyValid ?? false);
+        setOpenrouterInfo(data.openrouter ? { ...data.openrouter, usageDaily: data.openrouter.usageDaily ?? data.openrouter.usage_daily ?? 0 } : null);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchSession().finally(() => setLoading(false));
+  }, [fetchSession]);
 
   const connectOpenRouter = useCallback(() => {
     startOAuth({
@@ -60,6 +55,7 @@ export function useAuth(): AuthState {
     try {
       await fetch("/auth/exchange", { method: "DELETE" });
       setOpenrouterConnected(false);
+      setOpenrouterKeyValid(false);
     } catch {
       // Silently fail
     }
@@ -69,6 +65,7 @@ export function useAuth(): AuthState {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setOpenrouterConnected(false);
+    setOpenrouterKeyValid(false);
   }, []);
 
   return {
@@ -80,5 +77,6 @@ export function useAuth(): AuthState {
     connectOpenRouter,
     disconnectOpenRouter,
     logout,
+    refreshSession: fetchSession,
   };
 }
