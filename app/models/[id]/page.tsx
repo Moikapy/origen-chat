@@ -68,9 +68,9 @@ function Badge({ children, variant = "default" }: { children: React.ReactNode; v
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
-      <div className="text-lg font-semibold text-foreground">{value}</div>
+      <div className="text-base sm:text-lg font-semibold text-foreground">{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
@@ -146,47 +146,47 @@ function ModelDetail({ model }: { model: UIModel }) {
     <div className="min-h-screen bg-background text-foreground">
       <SiteNav active="models" />
 
-      <main className="mx-auto max-w-5xl px-6 py-12">
+      <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-12">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-          <Link href="/models" className="hover:text-foreground transition-colors">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 sm:mb-8 overflow-hidden">
+          <Link href="/models" className="hover:text-foreground transition-colors shrink-0">
             Models
           </Link>
-          <span>/</span>
-          <span className="text-foreground">{model.name}</span>
+          <span className="shrink-0">/</span>
+          <span className="text-foreground truncate">{model.name}</span>
         </div>
 
         {/* Hero */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <h1 className="text-3xl sm:text-4xl font-bold">{model.name}</h1>
+        <div className="mb-8 sm:mb-10">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold truncate">{model.name}</h1>
             {model.free ? <Badge variant="free">Free</Badge> : <Badge variant="default">Premium</Badge>}
           </div>
-          <p className="text-muted-foreground text-lg">by {model.provider}</p>
-          <div className="flex items-center gap-3 mt-3">
-            <code className="text-xs font-mono bg-muted px-2 py-1 rounded text-muted-foreground">
+          <p className="text-muted-foreground text-base sm:text-lg">by {model.provider}</p>
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            <code className="text-xs font-mono bg-muted px-2 py-1 rounded text-muted-foreground break-all">
               {model.slug}
             </code>
           </div>
 
           {model.fullDescription && (
-            <p className="mt-6 text-muted-foreground leading-relaxed max-w-3xl">
+            <p className="mt-6 text-muted-foreground leading-relaxed max-w-3xl text-sm sm:text-base">
               {model.fullDescription}
             </p>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 mb-12">
+        <div className="flex items-center gap-3 mb-8 sm:mb-12 flex-wrap">
           <Link
             href={`/chat?model=${encodeURIComponent(model.id)}`}
-            className="px-6 py-3 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity text-sm"
           >
-            Chat with {model.name}
+            Chat with this model
           </Link>
           <Link
             href={`/models/compare?models=${encodeURIComponent(model.slug)}`}
-            className="px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors text-sm"
           >
             Compare
           </Link>
@@ -194,14 +194,14 @@ function ModelDetail({ model }: { model: UIModel }) {
             href={`https://openrouter.ai/${model.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border border-border text-foreground font-medium hover:bg-accent transition-colors text-sm"
           >
             OpenRouter
           </a>
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-12">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-8 sm:mb-12">
           <StatCard label="Context" value={formatContext(model.contextLength)} sub="token window" />
           <StatCard
             label="Max Output"
@@ -221,10 +221,10 @@ function ModelDetail({ model }: { model: UIModel }) {
         </div>
 
         {/* Pricing */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">Pricing</h2>
+        <section className="mb-8 sm:mb-12">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Pricing</h2>
           {model.free ? (
-            <div className="rounded-lg border border-primary/30 bg-primary/10 p-6">
+            <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 sm:p-6">
               <div className="text-primary font-semibold text-lg">Free</div>
               <p className="text-sm text-primary/80 mt-1">
                 No API key required. No usage charges. Free models are rate-limited.
@@ -263,8 +263,8 @@ function ModelDetail({ model }: { model: UIModel }) {
 
         {/* Capabilities */}
         {model.supportedParameters.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold mb-4">Capabilities</h2>
+          <section className="mb-8 sm:mb-12">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Capabilities</h2>
             <div className="flex flex-wrap gap-2">
               {model.supportedParameters.map((p) => (
                 <ParameterTag key={p} param={p} />
@@ -274,10 +274,10 @@ function ModelDetail({ model }: { model: UIModel }) {
         )}
 
         {/* Modalities */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">Modalities</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-border bg-card p-5">
+        <section className="mb-8 sm:mb-12">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Modalities</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Input</h3>
               <div className="flex flex-wrap gap-2">
                 {inputModes.map((m) => (
@@ -287,7 +287,7 @@ function ModelDetail({ model }: { model: UIModel }) {
                 ))}
               </div>
             </div>
-            <div className="rounded-lg border border-border bg-card p-5">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Output</h3>
               <div className="flex flex-wrap gap-2">
                 {model.modalities.output.map((m) => (
@@ -302,7 +302,7 @@ function ModelDetail({ model }: { model: UIModel }) {
         </section>
 
         {/* Back */}
-        <div className="pt-8 border-t border-border/50">
+        <div className="pt-6 sm:pt-8 border-t border-border/50">
           <Link href="/models" className="text-sm text-primary hover:underline">
             &larr; Back to all models
           </Link>

@@ -557,7 +557,7 @@ function ModelCard({ model }: { model: UIModel }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className={`font-semibold ${model.free ? "text-primary" : "text-foreground"}`}>{model.name}</h3>
+            <h3 className={`font-semibold truncate ${model.free ? "text-primary" : "text-foreground"}`}>{model.name}</h3>
             {model.free && (
               <span className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
                 Free
