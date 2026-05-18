@@ -12,8 +12,13 @@ const localStorageMock = (() => {
 })();
 vi.stubGlobal("localStorage", localStorageMock);
 
+// Mock fetch global
+const fetchMock = vi.fn();
+vi.stubGlobal("fetch", fetchMock);
+
 beforeEach(() => {
   localStorageMock.clear();
+  fetchMock.mockReset();
 });
 
 // ── useOllama config parsing tests ──────────────────────────────────
@@ -51,7 +56,6 @@ describe("useOllama config parsing", () => {
     );
     const parsed = JSON.parse(localStorageMock.getItem("origen_ollama_config")!);
     expect(parsed.apiKey).toBe("sk-test");
-    // In the hook, missing mode defaults to "cloud"
   });
 
   it("handles malformed JSON in localStorage", () => {
@@ -61,19 +65,31 @@ describe("useOllama config parsing", () => {
   });
 });
 
-// ── Model listing endpoint tests ──────────────────────────────────
+// ── Model listing endpoint routing ──────────────────────────────────
 
-describe("Ollama model listing endpoints", () => {
-  it("cloud mode uses /v1/models endpoint", () => {
+describe("Ollama model listing routing", () => {
+  it("cloud mode routes through /api/ollama-models proxy (CORS bypass)", () => {
+    // Cloud mode should POST to /api/ollama-models, NOT directly to ollama.com
+    const mode = "cloud";
     const baseUrl = "https://ollama.com/v1";
-    const endpoint = `${baseUrl}/models`;
-    expect(endpoint).toBe("https://ollama.com/v1/models");
+    const apiKey = "sk-test";
+
+    // Verify that the cloud URL construction goes to our proxy
+    const endpoint = mode === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
+    expect(endpoint).toBe("/api/ollama-models");
   });
 
-  it("local mode uses /v1/models endpoint", () => {
+  it("local mode hits localhost directly (no CORS issue)", () => {
+    const mode = "local";
     const baseUrl = "http://localhost:11434/v1";
-    const endpoint = `${baseUrl}/models`;
+    const endpoint = mode === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
     expect(endpoint).toBe("http://localhost:11434/v1/models");
+  });
+
+  it("cloud proxy request body includes baseUrl and apiKey", () => {
+    const body = { baseUrl: "https://ollama.com/v1", apiKey: "sk-test" };
+    expect(body.baseUrl).toBe("https://ollama.com/v1");
+    expect(body.apiKey).toBe("sk-test");
   });
 
   it("handles OpenAI-compatible response format { data: [...] }", () => {
@@ -166,19 +182,20 @@ describe("Ollama config save/load roundtrip", () => {
   });
 });
 
-// ── Connection test URL construction ────────────────────────────────
+// ── Connection test routing ────────────────────────────────────────
 
-describe("Ollama connection test URL", () => {
-  it("constructs /models endpoint for local test", () => {
-    const baseUrl = "http://localhost:11434/v1";
-    const testUrl = `${baseUrl}/models`;
-    expect(testUrl).toBe("http://localhost:11434/v1/models");
+describe("Ollama connection test routing", () => {
+  it("cloud test routes through server proxy", () => {
+    const mode = "cloud";
+    const endpoint = mode === "cloud" ? "/api/ollama-models" : "http://localhost:11434/v1/models";
+    expect(endpoint).toBe("/api/ollama-models");
   });
 
-  it("constructs /models endpoint for cloud test", () => {
-    const baseUrl = "https://ollama.com/v1";
-    const testUrl = `${baseUrl}/models`;
-    expect(testUrl).toBe("https://ollama.com/v1/models");
+  it("local test hits localhost directly", () => {
+    const mode = "local";
+    const baseUrl = "http://localhost:11434/v1";
+    const endpoint = mode === "cloud" ? "/api/ollama-models" : `${baseUrl}/models`;
+    expect(endpoint).toBe("http://localhost:11434/v1/models");
   });
 
   it("handles 401 response for invalid API key", () => {

@@ -47,10 +47,10 @@ export function useOllama() {
     }
   }, []);
 
-  // Fetch models using the OpenAI-compatible /v1/models endpoint
+  // Fetch models — cloud routes through server proxy (CORS), local goes direct to localhost
   const refreshModels = useCallback(async (configKey?: string, configUrl?: string, configMode?: "cloud" | "local") => {
     const key = configKey || apiKey;
-    const baseUrl = (configUrl || url || CLOUD_URL).replace(/\/+$/, "");
+    const configBaseUrl = (configUrl || url || CLOUD_URL).replace(/\/+$/, "");
     const m = configMode || mode;
 
     if (m === "cloud" && !key) {
@@ -60,17 +60,29 @@ export function useOllama() {
     }
 
     setLoading(true);
-    const headers: Record<string, string> = {};
-    if (key) headers["Authorization"] = `Bearer ${key}`;
-
     try {
-      // Use /v1/models (OpenAI-compatible) for both cloud and local
-      const res = await fetch(`${baseUrl}/models`, {
-        headers,
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { data?: Array<{ id: string }>; models?: Array<{ name: string; size: number; modified_at: string }> };
+      let data: { data?: Array<{ id: string }>; models?: Array<{ name: string; size: number; modified_at: string }> };
+
+      if (m === "cloud") {
+        // Cloud: route through server proxy (browser can't hit ollama.com — CORS)
+        const res = await fetch("/api/ollama-models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ baseUrl: configBaseUrl, apiKey: key }),
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json() as typeof data;
+      } else {
+        // Local: direct browser request to localhost (no CORS issue)
+        const headers: Record<string, string> = {};
+        const res = await fetch(`${configBaseUrl}/models`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json() as typeof data;
+      }
 
       // Handle both OpenAI-compatible format ({ data: [...] }) and native Ollama format ({ models: [...] })
       const ollamaModels = (data.models || (data.data || []).map(d => ({
@@ -126,18 +138,32 @@ export function useOllama() {
     setConnected(false);
   }, []);
 
-  /** Test connection and return detailed status */
-  const testConnection = useCallback(async (testUrl?: string, testKey?: string): Promise<{ ok: boolean; error?: string; models?: OllamaModel[] }> => {
+  /** Test connection — cloud through server proxy, local direct */
+  const testConnection = useCallback(async (testUrl?: string, testKey?: string, testMode?: "cloud" | "local"): Promise<{ ok: boolean; error?: string; models?: OllamaModel[] }> => {
     const baseUrl = (testUrl || url || CLOUD_URL).replace(/\/+$/, "");
     const key = testKey || apiKey;
-    const headers: Record<string, string> = {};
-    if (key) headers["Authorization"] = `Bearer ${key}`;
+    const m = testMode || mode;
 
     try {
-      const res = await fetch(`${baseUrl}/models`, {
-        headers,
-        signal: AbortSignal.timeout(8000),
-      });
+      let res: Response;
+
+      if (m === "cloud") {
+        // Cloud: route through server proxy
+        res = await fetch("/api/ollama-models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ baseUrl, apiKey: key }),
+          signal: AbortSignal.timeout(12000),
+        });
+      } else {
+        // Local: direct browser request to localhost
+        const headers: Record<string, string> = {};
+        res = await fetch(`${baseUrl}/models`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+      }
+
       if (res.ok) {
         const data = await res.json() as { data?: Array<{ id: string }>; models?: Array<{ name: string; size: number; modified_at: string }> };
         const found = (data.models || (data.data || []).map(d => ({
@@ -158,11 +184,13 @@ export function useOllama() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        return { ok: false, error: "Cannot reach Ollama. If using localhost, set OLLAMA_ORIGINS=* or use Cloud mode." };
+        return { ok: false, error: m === "local"
+          ? "Cannot reach local Ollama. Make sure Ollama is running on localhost:11434."
+          : "Cannot reach Ollama Cloud. Try again or use Local mode." };
       }
       return { ok: false, error: msg };
     }
-  }, [url, apiKey]);
+  }, [url, apiKey, mode]);
 
   return {
     url,
